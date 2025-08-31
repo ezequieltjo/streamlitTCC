@@ -1,4 +1,8 @@
 import streamlit as st
+import pandas as pd
+import numpy as np
+import time
+import csv
 from PIL import Image
 
 if 'pagina_atual' not in st.session_state:
@@ -24,7 +28,7 @@ with st.sidebar:
 if st.session_state.pagina_atual == "home":
 
     st.set_page_config(
-        page_title="Otimização CODE",
+        page_title="Otimização da Alocação de Tutores CODE",
         page_icon="🧑🏽‍💻",
         layout="wide" 
     )
@@ -34,14 +38,33 @@ if st.session_state.pagina_atual == "home":
     with col2:
         # Adicionando imagem do projeto CODE
         try:
-            imgProjeto = Image.open("code-programacao.png")
-            st.image(imgProjeto, use_container_width=True)
+            banner = Image.open("code-programacao.png")
+            st.image(banner, use_container_width=True)
         except FileNotFoundError:
             st.error("Imagem do projeto não encontrada!")
 
-        st.markdown("<h1 style='text-align: center; color: #eb8334;'>Otimização CODE</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; color: #eb8334;'>Otimização da Alocação de Tutores CODE</h1>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center;'>Uma ferramenta que otimiza a alocação dos tutores às escolas do projeto.</p>", unsafe_allow_html=True)
-        st.markdown("<p style='text-align: center;'>Projeto de Trabalho de Conclusão de Curso do discente Ezequiel Teotônio Jó.</p>", unsafe_allow_html=True)
+        #st.markdown("<p style='text-align: center;'>Projeto de Trabalho de Conclusão de Curso do discente Ezequiel Teotônio Jó.</p>", unsafe_allow_html=True)
+
+        # Simulação de um processo de otimização   
+        if st.button("Otimizar", use_container_width=True):
+            st.success("Otimização iniciada!", icon="🚀")
+            time.sleep(2)  # Simula o tempo de processamento
+            st.success("Otimização concluída!", icon="✅")
+            
+            # Exibir resultados simulados no arquivo 'resultados.csv'
+            st.subheader("Resultados da Otimização")
+            try:
+                alocacao = pd.read_csv("alocacoes.csv")
+                st.dataframe(alocacao)
+            except FileNotFoundError:
+                st.error("Arquivo 'alocacoes.csv' não encontrado!")
+
+
+
+
+    
 
 if st.session_state.pagina_atual == "config":
     st.set_page_config(
