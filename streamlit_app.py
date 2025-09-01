@@ -53,12 +53,13 @@ if st.session_state.current_page == "home":
 
         optimization_done = False
         with btn_col2:
-            # Simulação de um processo de otimização   
-            if st.button("Otimizar", width="content"):
-                with st.spinner("Otimizando... Por favor, aguarde."):
-                    time.sleep(3)
-                    #st.success("Otimização concluída!", icon="✅")
-                    optimization_done = True
+            with st.container(horizontal_alignment="center"):
+                # Simulação de um processo de otimização   
+                if st.button("Otimizar", width="content"):
+                    with st.spinner("Otimizando... Por favor, aguarde."):
+                        time.sleep(3)
+                        st.success("Otimização concluída!", icon="✅")
+                        optimization_done = True
 
         if optimization_done:
             # Exibir resultados simulados no arquivo 'resultados.csv'
