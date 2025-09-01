@@ -48,23 +48,26 @@ if st.session_state.current_page == "home":
         st.markdown("<p style='text-align: center;'>Uma ferramenta que otimiza a alocação dos tutores às escolas do projeto.</p>", unsafe_allow_html=True)
         #st.markdown("<p style='text-align: center;'>Projeto de Trabalho de Conclusão de Curso do discente Ezequiel Teotônio Jó.</p>", unsafe_allow_html=True)
 
-        # A coluna do meio (btn_col2) será onde colocaremos o botão.
+        # Dividindo para centralizar o botão
         btn_col1, btn_col2, btn_col3 = st.columns([2, 1, 2]) 
 
+        optimization_done = False
         with btn_col2:
             # Simulação de um processo de otimização   
             if st.button("Otimizar", width="content"):
                 with st.spinner("Otimizando... Por favor, aguarde."):
                     time.sleep(3)
                     #st.success("Otimização concluída!", icon="✅")
-                        
-        # Exibir resultados simulados no arquivo 'resultados.csv'
-        st.subheader("Resultados da Otimização")
-        try:
-            alocacao = pd.read_csv("alocacoes.csv")
-            st.dataframe(alocacao)
-        except FileNotFoundError:
-            st.error("Arquivo 'alocacoes.csv' não encontrado!")
+                    optimization_done = True
+
+        if optimization_done:
+            # Exibir resultados simulados no arquivo 'resultados.csv'
+            st.subheader("Resultados da Otimização")
+            try:
+                alocacao = pd.read_csv("alocacoes.csv")
+                st.dataframe(alocacao)
+            except FileNotFoundError:
+                st.error("Arquivo 'alocacoes.csv' não encontrado!")
 
 # ------------------ CONFIGURAÇÕES ------------------
 if st.session_state.current_page == "config":
@@ -117,7 +120,7 @@ if st.session_state.current_page == "config":
         decayType = 'sigmoid'
 
         st.markdown("###### Tipo de Decaimento da Pontuação por Distância:")
-        # Cria um seletor de rádio na horizontal
+        
         decayOptions = ['Sigmoide', 'Linear']
         decayType = st.radio(
             "Escolha o tipo de decaimento:", 
