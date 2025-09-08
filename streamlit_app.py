@@ -49,17 +49,26 @@ if st.session_state.current_page == "home":
         #st.markdown("<p style='text-align: center;'>Projeto de Trabalho de Conclusão de Curso do discente Ezequiel Teotônio Jó.</p>", unsafe_allow_html=True)
 
         # Dividindo para centralizar o botão
-        btn_col1, btn_col2, btn_col3 = st.columns([2, 1, 2]) 
+        btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 1]) 
 
         optimization_done = False
         with btn_col2:
-            with st.container(horizontal_alignment="center"):
-                # Simulação de um processo de otimização   
-                if st.button("Otimizar", width="content"):
-                    with st.spinner("Otimizando... Por favor, aguarde."):
-                        time.sleep(3)
-                        st.success("Otimização concluída!", icon="✅")
-                        optimization_done = True
+            with st.container(horizontal_alignment="center",):
+                # Simulação de um processo de otimização
+                btn_col2_1, btn_col2_2 = st.columns([1, 1])
+
+                with btn_col2_1:
+                    if st.button("Importar dados", width="content"):
+                        st.session_state.current_page = 'config'
+                        st.rerun()
+
+                with btn_col2_2:
+                    if st.button("Otimizar", width="content"):
+                        with st.container(horizontal_alignment="center"):
+                            with st.spinner("Otimizando..."):
+                                time.sleep(3)
+                                #st.success("Otimização concluída!", icon="✅")
+                                optimization_done = True
 
         if optimization_done:
             # Exibir resultados simulados no arquivo 'resultados.csv'
@@ -139,6 +148,11 @@ if st.session_state.current_page == "config":
         sigmoidCurve = st.number_input("Escala de Inclinação da Curva Sigmoide:", min_value=0, value=2000, icon="📉")
 
     #st.write("Configurações: ", pref1, "/", pref2, "/", pref3, "/", baseDistance, "/", baseRanking, "/", decayType, "/", sigmoidCurve)
+
+    with st.container(horizontal_alignment="center"):
+        if st.button("Salvar Configurações", type="primary", use_container_width=False):
+            st.session_state.current_page = 'home'
+            st.rerun()
 
 # ------------------ INFORMAÇÕES ------------------
 if st.session_state.current_page == "info":
