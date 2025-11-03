@@ -406,23 +406,22 @@ def generate_allocation(tutors_file, schools_file, params_dict):
     - Um DataFrame do Pandas com a alocação final.
     """
     
-    try:
-        # --- 1. Definir Parâmetros de Turno (do notebook original) ---
-        # TODO: Você pode, no futuro, passar isso pelo 'params_dict' se quiser
-        SHIFT_MODE = 'days_shifts' # Traduzido de MODO_TURNOS
+try:
+        # --- Definir Parâmetros de Turno ---
+        # Pega o 'shift_mode' que veio do params_dict.
+        # Usa 'dias_turnos' como padrão se nada for passado.
+        SHIFT_MODE = params_dict.get('shift_mode', 'dias_turnos') 
         
-        if SHIFT_MODE == 'days_shifts': # 'dias_turnos'
-            # NOTA: Os valores das strings (Segunda, Manha, Tarde) são mantidos
-            # em português, pois eles DEVEM corresponder aos cabeçalhos do CSV.
+        if SHIFT_MODE == 'dias_turnos':
             days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
             shifts_per_day = ['Manha', 'Tarde']
             time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
-        elif SHIFT_MODE == 'shifts': # 'turnos'
+        elif SHIFT_MODE == 'turnos':
             time_slots = ['Manha', 'Tarde']
+        else:
+            raise ValueError(f"Modo de turno '{SHIFT_MODE}' desconhecido.")
 
-        # --- 2. Extrair Parâmetros de Configuração ---
-        # (os nomes 'pref1', 'decayType' etc. devem ser iguais às chaves 
-        #  que você usou ao salvar no st.session_state)
+        # --- Extrair Parâmetros de Configuração ---
         PREF1_SCORE = params_dict.get('pref1', 8000)
         PREF2_SCORE = params_dict.get('pref2', 7000)
         PREF3_SCORE = params_dict.get('pref3', 6000)
@@ -431,14 +430,13 @@ def generate_allocation(tutors_file, schools_file, params_dict):
         DISTANCE_DECAY_TYPE = params_dict.get('decayType', 'sigmoid')
         SIGMOID_SCALE = params_dict.get('sigmoidCurve', 2000)
 
-        # --- 3. Carregar Dados ---
-        # (Estas funções são as que modificamos anteriormente)
+        # --- Carregar Dados ---
         tutors, availability, preferences, rankings = read_tutors(tutors_file, SHIFT_MODE, time_slots)
         schools, vacancies = read_schools(schools_file, SHIFT_MODE, time_slots)
-        distances = read_distances() # Lê 'distancias.csv' do repositório
+        distances = read_distances()
         DISTANCE_MEAN = calculate_mean_distances() # Calcula a média de 'distancias.csv'
 
-        # --- 4. Calcular Benefícios ---
+        # --- Calcular Benefícios ---
         benefits = calculate_benefits(
             tutors, schools, preferences, distances, rankings,
             decay_type=DISTANCE_DECAY_TYPE,
