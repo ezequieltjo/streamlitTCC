@@ -4,6 +4,7 @@ import numpy as np
 import time
 import csv
 from PIL import Image
+import optimization as optimization
 
 st.set_page_config(
     page_title="Otimização da Alocação de Tutores CODE",
@@ -51,7 +52,7 @@ if st.session_state.current_page == "home":
         # Dividindo para centralizar o botão
         btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 1]) 
 
-        optimization_done = False
+        #optimization_done = False
         with btn_col2:
             with st.container(horizontal_alignment="center",):
                 # Simulação de um processo de otimização
@@ -62,6 +63,7 @@ if st.session_state.current_page == "home":
                         st.session_state.current_page = 'config'
                         st.rerun()
 
+                '''
                 with btn_col2_2:
                     if st.button("Otimizar", width="content"):
                         with st.container(horizontal_alignment="center"):
@@ -69,7 +71,38 @@ if st.session_state.current_page == "home":
                                 time.sleep(3)
                                 #st.success("Otimização concluída!", icon="✅")
                                 optimization_done = True
+                '''
 
+                with btn_col2_2:
+                    if st.button("Otimizar", width="content"):
+                        #  Verificar se a configuração foi salva
+                        if not st.session_state.get("saved_config", False):
+                            st.warning("Por favor, importe os dados e salve as configurações primeiro.")
+                        else:
+                            try:
+                                # Mostrar o spinner e rodar a otimização REAL
+                                with st.spinner("Otimizando... Isso pode levar alguns segundos."):
+                                    
+                                    # Pegar dados da sessão
+                                    t_file = st.session_state.tutors_file
+                                    s_file = st.session_state.schools_file
+                                    params = st.session_state.params
+                                    
+                                    # Chamar a função de otimização
+                                    df_resultado = optimization.generate_allocation(t_file, s_file, params)
+                                    
+                                    # Salvar resultados na sessão
+                                    st.session_state.df_alocacao_resultado = df_resultado
+                                    st.session_state.optimization_done = True
+                                    st.success("Otimização concluída!", icon="✅")
+
+                            except Exception as e:
+                                # Capturar e exibir qualquer erro que ocorra
+                                st.error(f"Erro durante a otimização: {e}")
+                                # Opcional: imprimir o traceback para depuração
+                                # st.exception(e)
+
+        '''
         if optimization_done:
             # Exibir resultados simulados no arquivo 'resultados.csv'
             st.subheader("Resultados da Otimização")
@@ -78,6 +111,41 @@ if st.session_state.current_page == "home":
                 st.dataframe(alocacao)
             except FileNotFoundError:
                 st.error("Arquivo 'alocacoes.csv' não encontrado!")
+'''
+
+        # 3. Verificar o st.session_state, não a variável local
+        if st.session_state.get("optimization_done", False):
+            st.markdown("---")
+            st.subheader("Resultados da Otimização")
+            try:
+                # 4. Ler o DataFrame salvo na sessão
+                alocacao = st.session_state.df_alocacao_resultado
+                
+                if alocacao.empty:
+                    st.info("O modelo foi executado, mas nenhuma alocação foi possível com os dados e restrições fornecidos.")
+                else:
+                    st.dataframe(alocacao)
+                    
+                    # 5. (Opcional) Adicionar um botão de download
+                    @st.cache_data
+                    def convert_df_to_csv(df):
+                        # Converte o DataFrame para CSV em memória
+                        return df.to_csv(index=False).encode('utf-8')
+
+                    csv_data = convert_df_to_csv(alocacao)
+                    
+                    st.download_button(
+                        label="Baixar alocação como CSV",
+                        data=csv_data,
+                        file_name="alocacao_final.csv",
+                        mime="text/csv",
+                    )
+                    
+            except AttributeError:
+                # Isso pode acontecer se 'optimization_done' for True mas 'df_alocacao_resultado' não existir
+                st.error("Erro ao carregar os resultados. Tente otimizar novamente.")
+            except Exception as e:
+                st.error(f"Erro ao exibir resultados: {e}")
 
 # ------------------ CONFIGURAÇÕES ------------------
 if st.session_state.current_page == "config":
@@ -95,7 +163,7 @@ if st.session_state.current_page == "config":
 
         if tutors_file is not None:
             try:
-                tutors_df = pd.read_csv(tutors_file)
+                #tutors_df = pd.read_csv(tutors_file)
                 st.success("Arquivo de Tutores carregado com sucesso!", icon="✅")
                 #st.dataframe(tutors_df.head())
             except Exception as e:
@@ -104,7 +172,7 @@ if st.session_state.current_page == "config":
         schools_file = st.file_uploader("Upload do arquivo de Escolas (CSV)", type=["csv"], key="schools_uploader")
         if schools_file is not None:
             try:
-                schools_df = pd.read_csv(schools_file)
+                #schools_df = pd.read_csv(schools_file)
                 st.success("Arquivo de Escolas carregado com sucesso!", icon="✅")
                 #st.dataframe(schools_df.head())
             except Exception as e:
@@ -149,10 +217,31 @@ if st.session_state.current_page == "config":
 
     #st.write("Configurações: ", pref1, "/", pref2, "/", pref3, "/", baseDistance, "/", baseRanking, "/", decayType, "/", sigmoidCurve)
 
-    with st.container(horizontal_alignment="center"):
-        if st.button("Salvar Configurações", type="primary", use_container_width=False):
-            st.session_state.current_page = 'home'
-            st.rerun()
+    if st.button("Salvar Configurações", type="primary", use_container_width=False):
+            # Verificar se os arquivos foram enviados
+            if tutors_file is None or schools_file is None:
+                st.error("Por favor, faça o upload dos arquivos de Tutores e Escolas.")
+            else:
+                # Salvar arquivos na sessão
+                st.session_state.tutors_file = tutors_file
+                st.session_state.schools_file = schools_file
+
+                # Salvar parâmetros na sessão
+                st.session_state.params = {
+                    "pref1": pref1,
+                    "pref2": pref2,
+                    "pref3": pref3,
+                    "baseDistance": baseDistance,
+                    "baseRanking": baseRanking,
+                    "decayType": decayType,
+                    "sigmoidCurve": sigmoidCurve
+                }
+
+                # Salvar flag de sucesso e mudar de página
+                st.session_state.saved_config = True
+                st.success("Configurações salvas! Retornando ao Início para otimizar.")
+                st.session_state.current_page = 'home'
+                st.rerun()
 
 # ------------------ INFORMAÇÕES ------------------
 if st.session_state.current_page == "info":
