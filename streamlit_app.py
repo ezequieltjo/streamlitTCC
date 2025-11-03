@@ -52,26 +52,14 @@ if st.session_state.current_page == "home":
         # Dividindo para centralizar o botão
         btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 1]) 
 
-        #optimization_done = False
         with btn_col2:
             with st.container(horizontal_alignment="center",):
-                # Simulação de um processo de otimização
                 btn_col2_1, btn_col2_2 = st.columns([1, 1])
 
                 with btn_col2_1:
                     if st.button("Importar dados", width="content"):
                         st.session_state.current_page = 'config'
                         st.rerun()
-
-                '''
-                with btn_col2_2:
-                    if st.button("Otimizar", width="content"):
-                        with st.container(horizontal_alignment="center"):
-                            with st.spinner("Otimizando..."):
-                                time.sleep(3)
-                                #st.success("Otimização concluída!", icon="✅")
-                                optimization_done = True
-                '''
 
                 with btn_col2_2:
                     if st.button("Otimizar", width="content"):
@@ -102,23 +90,12 @@ if st.session_state.current_page == "home":
                                 # Opcional: imprimir o traceback para depuração
                                 # st.exception(e)
 
-        '''
-        if optimization_done:
-            # Exibir resultados simulados no arquivo 'resultados.csv'
-            st.subheader("Resultados da Otimização")
-            try:
-                alocacao = pd.read_csv("alocacoes.csv")
-                st.dataframe(alocacao)
-            except FileNotFoundError:
-                st.error("Arquivo 'alocacoes.csv' não encontrado!")
-'''
-
-        # 3. Verificar o st.session_state, não a variável local
+        # Verificar o st.session_state, não a variável local
         if st.session_state.get("optimization_done", False):
             st.markdown("---")
             st.subheader("Resultados da Otimização")
             try:
-                # 4. Ler o DataFrame salvo na sessão
+                # Ler o DataFrame salvo na sessão
                 alocacao = st.session_state.df_alocacao_resultado
                 
                 if alocacao.empty:
@@ -126,7 +103,7 @@ if st.session_state.current_page == "home":
                 else:
                     st.dataframe(alocacao)
                     
-                    # 5. (Opcional) Adicionar um botão de download
+                    # Adicionar um botão de download
                     @st.cache_data
                     def convert_df_to_csv(df):
                         # Converte o DataFrame para CSV em memória
