@@ -159,6 +159,7 @@ if st.session_state.current_page == "config":
         st.markdown("##### Parâmetros do Algoritmo de Otimização")
         st.markdown("Ajuste os parâmetros que influenciam a alocação dos tutores às escolas:")
 
+        st.markdown("###### Modo de Turnos:")
         shift_mode_options = ['Dias e Turnos (10 colunas)', 'Apenas Turnos (2 colunas)']
         selected_shift_mode_label = st.radio(
             "Selecione a quantidade de turnos possíveis:",
@@ -171,6 +172,8 @@ if st.session_state.current_page == "config":
             shift_mode = 'dias_turnos'
         else:
             shift_mode = 'turnos'
+
+        st.markdown("###### Pontuação das preferências:")
 
         pref1 = st.number_input("Pontuação da 1º Preferência de Escola:", min_value=0, value= 8000, icon="🥇")
         #st.write("Primeira Preferência:", pref1)
