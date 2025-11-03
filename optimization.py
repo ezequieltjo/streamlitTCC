@@ -40,11 +40,8 @@ def read_tutors(tutors_file_object, MODO_TURNOS, time_slots):
     rankings = {}
 
     try:
-        # 1. O objeto do Streamlit (tutors_file_object) é um stream de bytes.
-        #    Precisamos decodificá-lo para texto usando TextIOWrapper.
+        # O objeto do Streamlit (tutors_file_object) é um stream de bytes.
         with io.TextIOWrapper(tutors_file_object, encoding='utf-8') as f:
-            
-            # 2. Agora o csv.DictReader pode ler o arquivo em memória como antes
             reader = csv.DictReader(f)
             
             for row in reader:
@@ -102,18 +99,16 @@ def read_schools(schools_file_object, MODO_TURNOS, time_slots):
     vacancies = {}
     
     try:
-        # 1. Decodifica o objeto de arquivo do Streamlit para texto
+        # Decodifica o objeto de arquivo do Streamlit para texto
         with io.TextIOWrapper(schools_file_object, encoding='utf-8') as f:
-            
-            # 2. O csv.DictReader agora lê o arquivo em memória
+
             reader = csv.DictReader(f)
             
             for row in reader:
                 # Usa .get() para evitar erro se a coluna 'Escola' não existir
                 school = row.get('Escola', '').strip()
                 if not school:
-                    # Pula linhas onde a escola não tem nome
-                    continue
+                    continue    # Pula linhas onde a escola não tem nome
                 
                 schools.append(school)
 
@@ -132,9 +127,6 @@ def read_schools(schools_file_object, MODO_TURNOS, time_slots):
         raise ValueError(f"Erro ao ler o arquivo de escolas: {e}. Verifique o formato do CSV.")
     
     return schools, vacancies
-
-import csv
-import io # Módulo 'io' não é necessário aqui, pois estamos lendo do disco.
 
 def read_distances():
     """
@@ -162,27 +154,22 @@ def read_distances():
     """
 
     distances = {}
-    
-    # 1. Define o nome do arquivo fixo que deve estar no repositório
     filename = distance_matrix
 
     try:
-        # 2. Usa o 'open' padrão, pois não está vindo do Streamlit
         with open(filename, 'r', encoding='utf-8') as f:
             reader = csv.reader(f)
             
             try:
-                # 3. Lê o cabeçalho (lista de escolas)
+                # Lê o cabeçalho (lista de escolas)
                 header = next(reader)
                 schools = [s.strip() for s in header[1:]]
             except StopIteration:
-                # Erro se o arquivo estiver vazio
                 raise ValueError(f"O arquivo '{filename}' está vazio.")
             
             # Processa cada linha da matriz
             for row in reader:
-                # Pula linhas em branco que possam existir no CSV
-                if not row:
+                if not row:     # Pula linhas vazias
                     continue
                 
                 origin_school = row[0].strip()
@@ -203,49 +190,18 @@ def read_distances():
                             distances[(origin_school, target_school)] = 0 
     
     except FileNotFoundError:
-        # Erro crucial para o Streamlit: informa se o arquivo não foi encontrado no repositório
+        # Informa se o arquivo não foi encontrado no repositório
         raise FileNotFoundError(
             f"ERRO: O arquivo '{filename}' não foi encontrado. "
             "Certifique-se de que ele esteja no mesmo diretório do seu script."
         )
     except Exception as e:
-        # Captura outros erros (ex: permissão, formato incorreto)
+        # Captura outros erros
         raise ValueError(f"Erro ao processar o arquivo de distâncias '{filename}': {e}")
         
     return distances
 
 import pandas as pd
-
-def calcular_media_distancias():
-    """
-    Lê a matriz de distâncias ('distancias.csv') e calcula a média geral.
-
-    Retorna:
-    - A média (float) de todas as distâncias > 0.
-    """
-
-    filename = distance_matrix
-    media_geral = 0.0  # Valor padrão
-
-    try:
-        df = pd.read_csv(filename, index_col=0)
-        
-        # Empilha a matriz para uma única coluna e filtra distâncias maiores que zero
-        distancias_relevantes = df.stack()
-        distancias_relevantes = distancias_relevantes[distancias_relevantes > 0]
-        
-        if not distancias_relevantes.empty:
-            media_geral = distancias_relevantes.mean()
-            
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            f"ERRO: O arquivo de distâncias '{filename}' não foi encontrado. "
-            "Verifique se ele está no repositório."
-        )
-    except Exception as e:
-        raise ValueError(f"Ocorreu um erro ao ler o arquivo de distâncias: {e}")
-
-    return media_geral
 
 def calculate_mean_distances():
     """
@@ -289,8 +245,8 @@ def linear_decay(distance, max_distance, base_score):
     """
     if max_distance == 0 or distance >= max_distance:
         return 0
-    # Fórmula da reta: y = mx + c
-    score = (-base_score / max_distance) * distance + base_score
+
+    score = (-base_score / max_distance) * distance + base_score    # Fórmula da reta decrescente
     return max(0, score) # Garante que a pontuação não seja negativa
 
 def sigmoid_decay(distance, bmax, mean, scale):
@@ -406,12 +362,12 @@ def generate_allocation(tutors_file, schools_file, params_dict):
     - Um DataFrame do Pandas com a alocação final.
     """
     
-try:
+    try:
         # --- Definir Parâmetros de Turno ---
         # Pega o 'shift_mode' que veio do params_dict.
         # Usa 'dias_turnos' como padrão se nada for passado.
         SHIFT_MODE = params_dict.get('shift_mode', 'dias_turnos') 
-        
+            
         if SHIFT_MODE == 'dias_turnos':
             days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
             shifts_per_day = ['Manha', 'Tarde']
@@ -449,7 +405,7 @@ try:
             distance_mean=DISTANCE_MEAN
         )
 
-        # --- 5. Construir e Rodar o Modelo MIP ---
+        # --- Construir e Rodar o Modelo MIP ---
         model = Model(sense=MAXIMIZE, solver_name=CBC)
 
         X = {
@@ -485,7 +441,7 @@ try:
         # Resolver o modelo
         model.optimize()
 
-        # --- 6. Extrair e Retornar os Resultados ---  
+        # --- Extrair e Retornar os Resultados ---  
         results_list = extract_allocation_results(model, tutors, time_slots, schools)
 
         if not results_list:
@@ -498,5 +454,4 @@ try:
         return df_allocation
 
     except Exception as e:
-        # Se qualquer coisa falhar, levanta o erro para o Streamlit exibir
         raise e
