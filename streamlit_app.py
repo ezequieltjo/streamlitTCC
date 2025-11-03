@@ -159,10 +159,9 @@ if st.session_state.current_page == "config":
         st.markdown("##### Parâmetros do Algoritmo de Otimização")
         st.markdown("Ajuste os parâmetros que influenciam a alocação dos tutores às escolas:")
 
-        st.markdown("Modo de Turnos")
         shift_mode_options = ['Dias e Turnos (10 colunas)', 'Apenas Turnos (2 colunas)']
         selected_shift_mode_label = st.radio(
-            "Selecione o formato dos seus arquivos CSV:",
+            "Selecione a quantidade de turnos possíveis:",
             options=shift_mode_options,
             horizontal=True
         )
