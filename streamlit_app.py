@@ -12,8 +12,18 @@ st.set_page_config(
     layout="wide" 
     )
 
+# --- INICIALIZAÇÃO DO ESTADO DA SESSÃO ---
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 'home'
+
+if 'optimization_done' not in st.session_state:
+    st.session_state.optimization_done = False
+
+if 'optimization_result' not in st.session_state:
+    st.session_state.optimization_result = None
+
+if 'saved_config' not in st.session_state:
+    st.session_state.saved_config = False
 
 def show_file_stats(t_file, s_file, shift_mode_label):
     """
@@ -151,7 +161,7 @@ if st.session_state.current_page == "home":
 
             st.markdown("---")
             st.markdown("### 📋 Lista de Alocação")
-            
+
             try:
                 # Ler o DataFrame salvo na sessão
                 alocacao = st.session_state.df_alocacao_resultado
@@ -268,34 +278,41 @@ if st.session_state.current_page == "config":
 
         sigmoidCurve = st.number_input("Escala de Inclinação da Curva Sigmoide:", min_value=0, value=2000, icon="📉")
 
+    if tutors_file or schools_file:
+        st.markdown("---")
+        st.markdown("##### 🔍 Pré-visualização dos Dados")
+        show_file_stats(tutors_file, schools_file, selected_shift_mode_label)
+
     #st.write("Configurações: ", pref1, "/", pref2, "/", pref3, "/", baseDistance, "/", baseRanking, "/", decayType, "/", sigmoidCurve)
 
-    if st.button("Salvar Configurações", type="primary", use_container_width=False):
-            # Verificar se os arquivos foram enviados
-            if tutors_file is None or schools_file is None:
-                st.error("Por favor, faça o upload dos arquivos de Tutores e Escolas.")
-            else:
-                # Salvar arquivos na sessão
-                st.session_state.tutors_file = tutors_file
-                st.session_state.schools_file = schools_file
+    btn_c1, btn_c2, btn_c3 = st.columns([2, 1, 2])
+    with btn_c2:
+        if st.button("Salvar Configurações", type="primary", use_container_width=False):
+                # Verificar se os arquivos foram enviados
+                if tutors_file is None or schools_file is None:
+                    st.error("Por favor, faça o upload dos arquivos de Tutores e Escolas.")
+                else:
+                    # Salvar arquivos na sessão
+                    st.session_state.tutors_file = tutors_file
+                    st.session_state.schools_file = schools_file
 
-                # Salvar parâmetros na sessão
-                st.session_state.params = {
-                    "pref1": pref1,
-                    "pref2": pref2,
-                    "pref3": pref3,
-                    "baseDistance": baseDistance,
-                    "baseRanking": baseRanking,
-                    "decayType": decayType,
-                    "sigmoidCurve": sigmoidCurve,
-                    "shift_mode": shift_mode
-                }
+                    # Salvar parâmetros na sessão
+                    st.session_state.params = {
+                        "pref1": pref1,
+                        "pref2": pref2,
+                        "pref3": pref3,
+                        "baseDistance": baseDistance,
+                        "baseRanking": baseRanking,
+                        "decayType": decayType,
+                        "sigmoidCurve": sigmoidCurve,
+                        "shift_mode": shift_mode
+                    }
 
-                # Salvar flag de sucesso e mudar de página
-                st.session_state.saved_config = True
-                st.success("Configurações salvas! Retornando ao Início para otimizar.")
-                st.session_state.current_page = 'home'
-                st.rerun()
+                    # Salvar flag de sucesso e mudar de página
+                    st.session_state.saved_config = True
+                    st.success("Configurações salvas! Retornando ao Início para otimizar.")
+                    st.session_state.current_page = 'home'
+                    st.rerun()
 
 # ------------------ INFORMAÇÕES ------------------
 if st.session_state.current_page == "info":

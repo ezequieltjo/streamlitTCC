@@ -397,8 +397,8 @@ def generate_allocation(tutors_file, schools_file, params_dict):
         SIGMOID_SCALE = params_dict.get('sigmoidCurve', 2000)
 
         # --- Carregar Dados ---
-        tutors, availability, preferences, rankings = read_tutors(tutors_file, SHIFT_MODE, time_slots)
-        schools, vacancies = read_schools(schools_file, SHIFT_MODE, time_slots)
+        tutors, availability, preferences, rankings, total_tutors = read_tutors(tutors_file, SHIFT_MODE, time_slots)
+        schools, vacancies, total_schools, total_vacancies = read_schools(schools_file, SHIFT_MODE, time_slots)
         distances = read_distances()
         DISTANCE_MEAN = calculate_mean_distances() # Calcula a média de 'distancias.csv'
 
@@ -463,9 +463,9 @@ def generate_allocation(tutors_file, schools_file, params_dict):
 
         # --- CÁLCULO DAS ESTATÍSTICAS ---
         stats = {
-            "total_tutors": len(tutors),
-            "total_schools": len(schools),
-            "total_vacancies": sum(vacancies.values()),
+            "total_tutors": total_tutors,
+            "total_schools": total_schools,
+            "total_vacancies": total_vacancies,
             "filled_vacancies": len(results_list)
         }
 
