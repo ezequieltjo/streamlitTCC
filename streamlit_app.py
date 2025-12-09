@@ -15,6 +15,36 @@ st.set_page_config(
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 'home'
 
+def show_file_stats(t_file, s_file, shift_mode_label):
+    """
+    Lê os arquivos carregados para exibir estatísticas rápidas na tela de configuração.
+    """
+    # Traduz o label do radio button para o código interno que o core espera
+    if shift_mode_label == 'Dias e Turnos (10 colunas)':
+        mode = 'days_shifts'
+    else:
+        mode = 'shifts'
+    
+    # Colunas para exibir as métricas lado a lado
+    c1, c2 = st.columns(2)
+
+    if t_file:
+        try:
+            # Chama a função de leitura do core apenas para pegar a contagem (n_tutors)
+            # Nota: A função read_tutors do core já faz o seek(0) para não estragar o arquivo
+            _, _, _, _, n_tutors = optimization.read_tutors(t_file, mode)
+            c1.info(f"✅ **{n_tutors}** Tutores identificados")
+        except Exception as e:
+            c1.error(f"Erro no arquivo de Tutores: {e}")
+
+    if s_file:
+        try:
+            # Chama a função de leitura do core para pegar escolas e vagas
+            _, _, n_schools, n_vacancies = optimization.read_schools(s_file, mode)
+            c2.info(f"✅ **{n_schools}** Escolas | **{n_vacancies}** Vagas totais")
+        except Exception as e:
+            c2.error(f"Erro no arquivo de Escolas: {e}")
+
 # --- BARRA LATERAL COM BOTÕES ---
 with st.sidebar:
     st.header("Menu")
@@ -68,7 +98,7 @@ if st.session_state.current_page == "home":
                             st.warning("Por favor, importe os dados e salve as configurações primeiro.")
                         else:
                             try:
-                                # Mostrar o spinner e rodar a otimização REAL
+                                # Mostrar o spinner e rodar a otimização
                                 with st.spinner("Otimizando... Isso pode levar alguns segundos."):
                                     
                                     # Pegar dados da sessão
@@ -87,13 +117,41 @@ if st.session_state.current_page == "home":
                             except Exception as e:
                                 # Capturar e exibir qualquer erro que ocorra
                                 st.error(f"Erro durante a otimização: {e}")
-                                # Opcional: imprimir o traceback para depuração
                                 # st.exception(e)
 
         # Verificar o st.session_state, não a variável local
         if st.session_state.get("optimization_done", False):
+
+            # Recupera o dicionário de resultados
+            res = st.session_state.optimization_result
+            df = res["dataframe"]
+            stats = res["stats"]
+
             st.markdown("---")
-            st.subheader("Resultados da Otimização")
+            st.subheader("📊 Estatísticas da Alocação")
+            
+            # 4 Colunas para métricas (Dashboard)
+            m1, m2, m3, m4 = st.columns(4)
+            
+            m1.metric("Tutores Inscritos", stats["total_tutors"])
+            m2.metric("Escolas Disponíveis", stats["total_schools"])
+            m3.metric("Vagas Totais", stats["total_vacancies"])
+            
+            # Lógica para a cor do delta (Vagas preenchidas)
+            vagas_ocupadas = stats["filled_vacancies"]
+            vagas_totais = stats["total_vacancies"]
+            if vagas_ocupadas < vagas_totais:
+                delta_msg = f"{vagas_totais - vagas_ocupadas} vagas ociosas"
+                delta_color = "off" # Cinza/Normal
+            else:
+                delta_msg = "Todas preenchidas!"
+                delta_color = "normal" # Verde
+
+            m4.metric("Vagas Preenchidas", vagas_ocupadas, delta=delta_msg, delta_color=delta_color)
+
+            st.markdown("---")
+            st.markdown("### 📋 Lista de Alocação")
+            
             try:
                 # Ler o DataFrame salvo na sessão
                 alocacao = st.session_state.df_alocacao_resultado
@@ -143,6 +201,8 @@ if st.session_state.current_page == "config":
                 #tutors_df = pd.read_csv(tutors_file)
                 st.success("Arquivo de Tutores carregado com sucesso!", icon="✅")
                 #st.dataframe(tutors_df.head())
+
+
             except Exception as e:
                 st.error(f"Erro ao ler o arquivo de Tutores: {e}")
 

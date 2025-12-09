@@ -40,6 +40,9 @@ def read_tutors(tutors_file_object, MODO_TURNOS, time_slots):
     rankings = {}
 
     try:
+        # Rebobina o arquivo para garantir leitura do início
+        tutors_file_object.seek(0)
+
         # O objeto do Streamlit (tutors_file_object) é um stream de bytes.
         with io.TextIOWrapper(tutors_file_object, encoding='utf-8') as f:
             reader = csv.DictReader(f)
@@ -75,7 +78,7 @@ def read_tutors(tutors_file_object, MODO_TURNOS, time_slots):
         # Relança um erro claro que o Streamlit pode capturar e exibir com st.error()
         raise ValueError(f"Erro ao ler o arquivo de tutores: {e}. Verifique o formato do CSV.")
         
-    return tutors, availability, preferences, rankings
+    return tutors, availability, preferences, rankings, len(tutors)
 
 def read_schools(schools_file_object, MODO_TURNOS, time_slots):
     """
@@ -97,8 +100,12 @@ def read_schools(schools_file_object, MODO_TURNOS, time_slots):
 
     schools = []
     vacancies = {}
+    total_vacancies = 0
     
     try:
+        # Rebobina o arquivo para garantir leitura do início
+        schools_file_object.seek(0)
+
         # Decodifica o objeto de arquivo do Streamlit para texto
         with io.TextIOWrapper(schools_file_object, encoding='utf-8') as f:
 
@@ -116,17 +123,22 @@ def read_schools(schools_file_object, MODO_TURNOS, time_slots):
                     for time_slot in time_slots:
                         # Usa .get() para segurança e trata strings vazias como '0'
                         slot_val = row.get(time_slot, '0')
-                        vacancies[(time_slot, school)] = int(slot_val if slot_val else '0')
+                        val = int(slot_val if slot_val else '0')
+                        vacancies[(time_slot, school)] = val
+                        total_vacancies += val
+
                 elif MODO_TURNOS == 'turnos':
                     for time_slot in ['Manha', 'Tarde']:
                         slot_val = row.get(time_slot, '0')
-                        vacancies[(time_slot, school)] = int(slot_val if slot_val else '0')
+                        val = int(slot_val if slot_val else '0')
+                        vacancies[(time_slot, school)] = val
+                        total_vacancies += val
     
     except Exception as e:
         # Relança um erro claro que o Streamlit pode capturar e exibir com st.error()
         raise ValueError(f"Erro ao ler o arquivo de escolas: {e}. Verifique o formato do CSV.")
     
-    return schools, vacancies
+    return schools, vacancies, len(schools), total_vacancies
 
 def read_distances():
     """
@@ -200,8 +212,6 @@ def read_distances():
         raise ValueError(f"Erro ao processar o arquivo de distâncias '{filename}': {e}")
         
     return distances
-
-import pandas as pd
 
 def calculate_mean_distances():
     """
@@ -450,8 +460,19 @@ def generate_allocation(tutors_file, schools_file, params_dict):
         
         # Converte a lista de resultados em um DataFrame
         df_allocation = pd.DataFrame(results_list)
-        
-        return df_allocation
+
+        # --- CÁLCULO DAS ESTATÍSTICAS ---
+        stats = {
+            "total_tutors": len(tutors),
+            "total_schools": len(schools),
+            "total_vacancies": sum(vacancies.values()),
+            "filled_vacancies": len(results_list)
+        }
+
+        return {
+            "dataframe": df_allocation,
+            "stats": stats
+        }
 
     except Exception as e:
         raise e
