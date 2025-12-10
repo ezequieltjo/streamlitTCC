@@ -10,7 +10,7 @@ distance_matrix = 'distancias.csv'
 # FUNÇÕES DE LEITURA DE ARQUIVOS
 # =============================================================================
 
-def read_tutors(tutors_file_object, MODO_TURNOS, time_slots):
+def read_tutors(tutors_file_object, shift_mode):
     """
     Lê o OBJETO DE ARQUIVO CSV (vindo do Streamlit) de tutores com disponibilidade e preferências.
 
@@ -55,14 +55,19 @@ def read_tutors(tutors_file_object, MODO_TURNOS, time_slots):
                 rank_val = row.get('Ranking', '0')
                 rankings[tutor] = int(rank_val if rank_val else '0')
 
-                if MODO_TURNOS == 'dias_turnos':
-                    # Map availability for all time slots in 'dias_turnos' mode
+                if shift_mode == 'days_shifts':
+                    days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
+                    shifts_per_day = ['Manha', 'Tarde']
+                    time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
+
+                    # Map availability for all time slots in 'days_shifts' mode
                     for time_slot in time_slots:
                         # Usa .get() para segurança e trata strings vazias como '0'
                         slot_val = row.get(time_slot, '0')
                         availability[(tutor, time_slot)] = int(slot_val if slot_val else '0')
-                elif MODO_TURNOS == 'turnos':
-                    # Map availability for 'turnos' mode (Manha, Tarde)
+
+                elif shift_mode == 'shifts':
+                    # Map availability for 'shifts' mode (Manha, Tarde)
                     for time_slot in ['Manha', 'Tarde']:
                         slot_val = row.get(time_slot, '0')
                         availability[(tutor, time_slot)] = int(slot_val if slot_val else '0')

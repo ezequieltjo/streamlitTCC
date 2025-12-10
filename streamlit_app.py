@@ -31,9 +31,9 @@ def show_file_stats(t_file, s_file, shift_mode_label):
     """
     # Traduz o label do radio button para o código interno que o core espera
     if shift_mode_label == 'Dias e Turnos (10 colunas)':
-        mode = 'days_shifts'
+        shift_mode = 'days_shifts'
     else:
-        mode = 'shifts'
+        shift_mode = 'shifts'
     
     # Colunas para exibir as métricas lado a lado
     c1, c2 = st.columns(2)
@@ -42,7 +42,7 @@ def show_file_stats(t_file, s_file, shift_mode_label):
         try:
             # Chama a função de leitura do core apenas para pegar a contagem (n_tutors)
             # Nota: A função read_tutors do core já faz o seek(0) para não estragar o arquivo
-            _, _, _, _, n_tutors = optimization.read_tutors(t_file, mode)
+            _, _, _, _, n_tutors = optimization.read_tutors(t_file, shift_mode)
             c1.info(f"✅ **{n_tutors}** Tutores identificados")
         except Exception as e:
             c1.error(f"Erro no arquivo de Tutores: {e}")
@@ -50,7 +50,7 @@ def show_file_stats(t_file, s_file, shift_mode_label):
     if s_file:
         try:
             # Chama a função de leitura do core para pegar escolas e vagas
-            _, _, n_schools, n_vacancies = optimization.read_schools(s_file, mode)
+            _, _, n_schools, n_vacancies = optimization.read_schools(s_file, shift_mode)
             c2.info(f"✅ **{n_schools}** Escolas | **{n_vacancies}** Vagas totais")
         except Exception as e:
             c2.error(f"Erro no arquivo de Escolas: {e}")
