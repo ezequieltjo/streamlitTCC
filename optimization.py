@@ -85,7 +85,7 @@ def read_tutors(tutors_file_object, shift_mode):
         
     return tutors, availability, preferences, rankings, len(tutors)
 
-def read_schools(schools_file_object, MODO_TURNOS, time_slots):
+def read_schools(schools_file_object, shift_mode):
     """
     Lê o OBJETO DE ARQUIVO CSV (vindo do Streamlit) de escolas com vagas por turno.
 
@@ -124,7 +124,11 @@ def read_schools(schools_file_object, MODO_TURNOS, time_slots):
                 
                 schools.append(school)
 
-                if MODO_TURNOS == 'dias_turnos':
+                if shift_mode == 'days_shifts':
+                    days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
+                    shifts_per_day = ['Manha', 'Tarde']
+                    time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
+
                     for time_slot in time_slots:
                         # Usa .get() para segurança e trata strings vazias como '0'
                         slot_val = row.get(time_slot, '0')
@@ -132,7 +136,7 @@ def read_schools(schools_file_object, MODO_TURNOS, time_slots):
                         vacancies[(time_slot, school)] = val
                         total_vacancies += val
 
-                elif MODO_TURNOS == 'turnos':
+                elif shift_mode == 'shifts':
                     for time_slot in ['Manha', 'Tarde']:
                         slot_val = row.get(time_slot, '0')
                         val = int(slot_val if slot_val else '0')
