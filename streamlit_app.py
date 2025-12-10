@@ -212,7 +212,6 @@ if st.session_state.current_page == "config":
                 st.success("Arquivo de Tutores carregado com sucesso!", icon="✅")
                 #st.dataframe(tutors_df.head())
 
-
             except Exception as e:
                 st.error(f"Erro ao ler o arquivo de Tutores: {e}")
 

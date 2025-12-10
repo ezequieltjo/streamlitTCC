@@ -385,16 +385,7 @@ def generate_allocation(tutors_file, schools_file, params_dict):
         # --- Definir Parâmetros de Turno ---
         # Pega o 'shift_mode' que veio do params_dict.
         # Usa 'dias_turnos' como padrão se nada for passado.
-        SHIFT_MODE = params_dict.get('shift_mode', 'dias_turnos') 
-            
-        if SHIFT_MODE == 'dias_turnos':
-            days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
-            shifts_per_day = ['Manha', 'Tarde']
-            time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
-        elif SHIFT_MODE == 'turnos':
-            time_slots = ['Manha', 'Tarde']
-        else:
-            raise ValueError(f"Modo de turno '{SHIFT_MODE}' desconhecido.")
+        shift_mode = params_dict.get('shift_mode') 
 
         # --- Extrair Parâmetros de Configuração ---
         PREF1_SCORE = params_dict.get('pref1', 8000)
@@ -406,8 +397,8 @@ def generate_allocation(tutors_file, schools_file, params_dict):
         SIGMOID_SCALE = params_dict.get('sigmoidCurve', 2000)
 
         # --- Carregar Dados ---
-        tutors, availability, preferences, rankings, total_tutors = read_tutors(tutors_file, SHIFT_MODE, time_slots)
-        schools, vacancies, total_schools, total_vacancies = read_schools(schools_file, SHIFT_MODE, time_slots)
+        tutors, availability, preferences, rankings, total_tutors = read_tutors(tutors_file, shift_mode)
+        schools, vacancies, total_schools, total_vacancies = read_schools(schools_file, shift_mode)
         distances = read_distances()
         DISTANCE_MEAN = calculate_mean_distances() # Calcula a média de 'distancias.csv'
 
