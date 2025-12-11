@@ -40,44 +40,43 @@ def read_tutors(tutors_file_object, shift_mode):
     rankings = {}
 
     try:
-        # Rebobina o arquivo para garantir leitura do início
-        tutors_file_object.seek(0)
+        tutors_file_object.seek(0)              # Rebobina o arquivo para garantir leitura do início        
+        content = tutors_file_object.read().decode('utf-8')        # Decodifica o conteúdo do arquivo
+        f = io.StringIO(content)                      # Cria um objeto StringIO para o csv.DictReader
 
-        # O objeto do Streamlit (tutors_file_object) é um stream de bytes.
-        with io.StringIO(tutors_file_object, encoding='utf-8') as f:
-            reader = csv.DictReader(f)
+        reader = csv.DictReader(f)
             
-            for row in reader:
-                tutor = row['Tutor'].strip()
-                tutors.append(tutor)
+        for row in reader:
+            tutor = row['Tutor'].strip()
+            tutors.append(tutor)
 
-                # Adiciona verificação para valores vazios antes de converter para int
-                rank_val = row.get('Ranking', '0')
-                rankings[tutor] = int(rank_val if rank_val else '0')
+            # Adiciona verificação para valores vazios antes de converter para int
+            rank_val = row.get('Ranking', '0')
+            rankings[tutor] = int(rank_val if rank_val else '0')
 
-                if shift_mode == 'days_shifts':
-                    days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
-                    shifts_per_day = ['Manha', 'Tarde']
-                    time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
+            if shift_mode == 'days_shifts':
+                days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
+                shifts_per_day = ['Manha', 'Tarde']
+                time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
 
-                    # Map availability for all time slots in 'days_shifts' mode
-                    for time_slot in time_slots:
-                        # Usa .get() para segurança e trata strings vazias como '0'
-                        slot_val = row.get(time_slot, '0')
-                        availability[(tutor, time_slot)] = int(slot_val if slot_val else '0')
+                # Map availability for all time slots in 'days_shifts' mode
+                for time_slot in time_slots:
+                    # Usa .get() para segurança e trata strings vazias como '0'
+                    slot_val = row.get(time_slot, '0')
+                    availability[(tutor, time_slot)] = int(slot_val if slot_val else '0')
 
-                elif shift_mode == 'shifts':
+            elif shift_mode == 'shifts':
                     # Map availability for 'shifts' mode (Manha, Tarde)
-                    for time_slot in ['Manha', 'Tarde']:
-                        slot_val = row.get(time_slot, '0')
-                        availability[(tutor, time_slot)] = int(slot_val if slot_val else '0')
+                for time_slot in ['Manha', 'Tarde']:
+                    slot_val = row.get(time_slot, '0')
+                    availability[(tutor, time_slot)] = int(slot_val if slot_val else '0')
                 
-                # Usa .get() para evitar erros caso as colunas de preferência não existam
-                preferences[tutor] = [
-                    row.get('Preferencia1'),
-                    row.get('Preferencia2'),
-                    row.get('Preferencia3')
-                ]
+            # Usa .get() para evitar erros caso as colunas de preferência não existam
+            preferences[tutor] = [
+                row.get('Preferencia1'),
+                row.get('Preferencia2'),
+                row.get('Preferencia3')
+            ]
     
     except Exception as e:
         # Relança um erro claro que o Streamlit pode capturar e exibir com st.error()
@@ -108,40 +107,38 @@ def read_schools(schools_file_object, shift_mode):
     total_vacancies = 0
     
     try:
-        # Rebobina o arquivo para garantir leitura do início
-        schools_file_object.seek(0)
+        schools_file_object.seek(0)              # Rebobina o arquivo para garantir leitura do início        
+        content = schools_file_object.read().decode('utf-8')        # Decodifica o conteúdo do arquivo
+        f = io.StringIO(content)                      # Cria um objeto StringIO para o csv.DictReader
 
-        # Decodifica o objeto de arquivo do Streamlit para texto
-        with io.StringIO(schools_file_object, encoding='utf-8') as f:
-
-            reader = csv.DictReader(f)
+        reader = csv.DictReader(f)
             
-            for row in reader:
-                # Usa .get() para evitar erro se a coluna 'Escola' não existir
-                school = row.get('Escola', '').strip()
-                if not school:
-                    continue    # Pula linhas onde a escola não tem nome
+        for row in reader:
+            # Usa .get() para evitar erro se a coluna 'Escola' não existir
+            school = row.get('Escola', '').strip()
+            if not school:
+                continue    # Pula linhas onde a escola não tem nome
                 
-                schools.append(school)
+            schools.append(school)
 
-                if shift_mode == 'days_shifts':
-                    days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
-                    shifts_per_day = ['Manha', 'Tarde']
-                    time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
+            if shift_mode == 'days_shifts':
+                days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
+                shifts_per_day = ['Manha', 'Tarde']
+                time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
 
-                    for time_slot in time_slots:
-                        # Usa .get() para segurança e trata strings vazias como '0'
-                        slot_val = row.get(time_slot, '0')
-                        val = int(slot_val if slot_val else '0')
-                        vacancies[(time_slot, school)] = val
-                        total_vacancies += val
+                for time_slot in time_slots:
+                    # Usa .get() para segurança e trata strings vazias como '0'
+                    slot_val = row.get(time_slot, '0')
+                    val = int(slot_val if slot_val else '0')
+                    vacancies[(time_slot, school)] = val
+                    total_vacancies += val
 
-                elif shift_mode == 'shifts':
-                    for time_slot in ['Manha', 'Tarde']:
-                        slot_val = row.get(time_slot, '0')
-                        val = int(slot_val if slot_val else '0')
-                        vacancies[(time_slot, school)] = val
-                        total_vacancies += val
+            elif shift_mode == 'shifts':
+                for time_slot in ['Manha', 'Tarde']:
+                    slot_val = row.get(time_slot, '0')
+                    val = int(slot_val if slot_val else '0')
+                    vacancies[(time_slot, school)] = val
+                    total_vacancies += val
     
     except Exception as e:
         # Relança um erro claro que o Streamlit pode capturar e exibir com st.error()
@@ -384,8 +381,17 @@ def generate_allocation(tutors_file, schools_file, params_dict):
     try:
         # --- Definir Parâmetros de Turno ---
         # Pega o 'shift_mode' que veio do params_dict.
-        # Usa 'dias_turnos' como padrão se nada for passado.
+        # Usa 'days_shifts' (dias e turnos) como padrão se nada for definido.
         shift_mode = params_dict.get('shift_mode') 
+
+        if shift_mode == 'days_shifts':
+            days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
+            shifts_per_day = ['Manha', 'Tarde']
+            time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
+        elif shift_mode == 'shifts':
+            time_slots = ['Manha', 'Tarde']
+        else:
+            raise ValueError(f"Modo de turno '{shift_mode}' desconhecido.")
 
         # --- Extrair Parâmetros de Configuração ---
         PREF1_SCORE = params_dict.get('pref1', 8000)
