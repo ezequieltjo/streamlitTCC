@@ -44,7 +44,7 @@ def read_tutors(tutors_file_object, shift_mode):
         tutors_file_object.seek(0)
 
         # O objeto do Streamlit (tutors_file_object) é um stream de bytes.
-        with io.TextIOWrapper(tutors_file_object, encoding='utf-8') as f:
+        with io.StringIO(tutors_file_object, encoding='utf-8') as f:
             reader = csv.DictReader(f)
             
             for row in reader:
@@ -112,7 +112,7 @@ def read_schools(schools_file_object, shift_mode):
         schools_file_object.seek(0)
 
         # Decodifica o objeto de arquivo do Streamlit para texto
-        with io.TextIOWrapper(schools_file_object, encoding='utf-8') as f:
+        with io.StringIO(schools_file_object, encoding='utf-8') as f:
 
             reader = csv.DictReader(f)
             
