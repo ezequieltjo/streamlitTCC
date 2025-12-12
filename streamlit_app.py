@@ -43,7 +43,7 @@ def show_file_stats(t_file, s_file, shift_mode_label):
             # Chama a função de leitura do core apenas para pegar a contagem (n_tutors)
             # Nota: A função read_tutors do core já faz o seek(0) para não estragar o arquivo
             _, _, _, _, n_tutors = optimization.read_tutors(t_file, shift_mode)
-            c1.info(f"✅ **{n_tutors}** Tutores identificados")
+            c1.info(f"✅ **{n_tutors}** Tutores importados")
         except Exception as e:
             c1.error(f"Erro no arquivo de Tutores: {e}")
 
@@ -51,7 +51,7 @@ def show_file_stats(t_file, s_file, shift_mode_label):
         try:
             # Chama a função de leitura do core para pegar escolas e vagas
             _, _, n_schools, n_vacancies = optimization.read_schools(s_file, shift_mode)
-            c2.info(f"✅ **{n_schools}** Escolas | **{n_vacancies}** Vagas totais")
+            c2.info(f"✅ **{n_schools}** Escolas importadas, com **{n_vacancies}** vagas totais")
         except Exception as e:
             c2.error(f"Erro no arquivo de Escolas: {e}")
 
@@ -117,10 +117,13 @@ if st.session_state.current_page == "home":
                                     params = st.session_state.params
                                     
                                     # Chamar a função de otimização
-                                    df_resultado = optimization.generate_allocation(t_file, s_file, params)
+                                    result_dict = optimization.generate_allocation(t_file, s_file, params)
+
+                                    # Salvar o resultado completo na sessão
+                                    st.session_state.optimization_result = result_dict
                                     
-                                    # Salvar resultados na sessão
-                                    st.session_state.df_alocacao_resultado = df_resultado
+                                    # Salvar o DataFrame na variável que a tabela espera
+                                    st.session_state.df_allocation_result = result_dict["dataframe"]
                                     st.session_state.optimization_done = True
                                     st.success("Otimização concluída!", icon="✅")
 
@@ -164,12 +167,12 @@ if st.session_state.current_page == "home":
 
             try:
                 # Ler o DataFrame salvo na sessão
-                alocacao = st.session_state.df_alocacao_resultado
+                allocation = st.session_state.df_allocation_result
                 
-                if alocacao.empty:
+                if allocation.empty:
                     st.info("O modelo foi executado, mas nenhuma alocação foi possível com os dados e restrições fornecidos.")
                 else:
-                    st.dataframe(alocacao)
+                    st.dataframe(allocation)
                     
                     # Adicionar um botão de download
                     @st.cache_data
@@ -177,7 +180,7 @@ if st.session_state.current_page == "home":
                         # Converte o DataFrame para CSV em memória
                         return df.to_csv(index=False).encode('utf-8')
 
-                    csv_data = convert_df_to_csv(alocacao)
+                    csv_data = convert_df_to_csv(allocation)
                     
                     st.download_button(
                         label="Baixar alocação como CSV",
@@ -187,7 +190,7 @@ if st.session_state.current_page == "home":
                     )
                     
             except AttributeError:
-                # Isso pode acontecer se 'optimization_done' for True mas 'df_alocacao_resultado' não existir
+                # Isso pode acontecer se 'optimization_done' for True mas 'df_allocation_result' não existir
                 st.error("Erro ao carregar os resultados. Tente otimizar novamente.")
             except Exception as e:
                 st.error(f"Erro ao exibir resultados: {e}")
