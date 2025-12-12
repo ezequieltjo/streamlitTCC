@@ -241,9 +241,9 @@ if st.session_state.current_page == "config":
 
         # Converte a seleção do usuário para os valores que o seu script espera
         if selected_shift_mode_label == 'Dias e Turnos (10 colunas)':
-            shift_mode = 'dias_turnos'
+            shift_mode = 'days_shifts'
         else:
-            shift_mode = 'turnos'
+            shift_mode = 'shifts'
 
         st.markdown("###### Pontuação das preferências:")
 
