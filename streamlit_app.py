@@ -87,6 +87,7 @@ if st.session_state.current_page == "home":
 
         st.markdown("<h1 style='text-align: center; color: #eb8334;'>Otimização da Alocação de Tutores CODE</h1>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center;'>Uma ferramenta que otimiza a alocação dos tutores às escolas do projeto.</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center;'>Importe as planilhas de Tutores e Escolas, salve as configurações e clique em Otimizar para gerar o resultado da alocação.</p>", unsafe_allow_html=True)
         #st.markdown("<p style='text-align: center;'>Projeto de Trabalho de Conclusão de Curso do discente Ezequiel Teotônio Jó.</p>", unsafe_allow_html=True)
 
         # Dividindo para centralizar o botão
