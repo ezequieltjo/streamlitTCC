@@ -423,6 +423,11 @@ def generate_allocation(tutors_file, schools_file, params_dict):
 
         # --- Construir e Rodar o Modelo MIP ---
         model = Model(sense=MAXIMIZE, solver_name=CBC)
+        model.verbose = 0 # Silencia os logs do solver no console
+
+        # --- GARANTIA DE REPRODUTIBILIDADE ---
+        model.threads = 1  # Força o uso de apenas 1 núcleo do processador
+        model.seed = 37    # Fixa a semente matemática para os desempates e heurísticas
 
         X = {
             (t, time_slot, s): model.add_var(name=f'X_{t}_{time_slot}_{s}', var_type=BINARY)
