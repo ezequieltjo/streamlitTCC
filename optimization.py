@@ -219,6 +219,64 @@ def read_distances():
         
     return distances
 
+def calculate_mean_distances(active_schools):
+    """
+    Lê a matriz de distâncias ('distancias.csv') e calcula a média dinamicamente.
+    Considera apenas as escolas presentes na lista 'active_schools'.
+    
+    Args:
+    - active_schools: Lista de strings com os nomes das escolas que têm vagas > 0.
+
+    Retorna:
+    - A média (float) das distâncias > 0 entre as escolas ativas.
+    """
+
+    filename = distance_matrix  
+    distances_mean = 0.0
+
+    print(f"--- Calculando média de distância dinâmica ---")
+    print(f"Escolas com vagas neste cenário: {len(active_schools)}")
+
+    try:
+        df = pd.read_csv(filename, index_col=0)
+        
+        # Identifica escolas que estão na lista de vagas mas NÃO estão na matriz
+        missing_schools = [e for e in active_schools if e not in df.index]
+        
+        if len(missing_schools) > 0:
+            print(f"⚠️ ATENÇÃO: {len(missing_schools)} escolas com vagas NÃO foram encontradas na matriz de distâncias:")
+            for school in missing_schools:
+                print(f"   -> {school}")
+
+        # Interseção: escolas que estão 'ativas' E que existem na matriz
+        valid_schools = [e for e in active_schools if e in df.index]
+        
+        if len(valid_schools) >= 2:
+            print(f"Matriz filtrada para {len(valid_schools)} x {len(valid_schools)} escolas.")
+            df = df.loc[valid_schools, valid_schools]
+        else:
+            print("AVISO: Menos de 2 escolas ativas encontradas na matriz. Usando matriz completa para o cálculo.")
+        
+        # Filtra distâncias maiores que zero
+        relevant_distances = df.stack()
+        relevant_distances = relevant_distances[relevant_distances > 0]
+        
+        if not relevant_distances.empty:
+            distances_mean = relevant_distances.mean()
+            print(f"DISTANCE_MEAN = {distances_mean:.2f}")
+        else:
+            print("Nenhuma distância válida encontrada > 0. Retornando 0.")
+            
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"ERROR: The distance file '{filename}' was not found. "
+            "Check if it is in the repository."
+        )
+    except Exception as e:
+        raise ValueError(f"An error occurred while reading the distance file: {e}")
+
+    return distances_mean
+'''
 def calculate_mean_distances():
     """
     Lê a matriz de distâncias ('distancias.csv') e calcula a média geral.
@@ -249,7 +307,7 @@ def calculate_mean_distances():
         raise ValueError(f"An error occurred while reading the distance file: {e}")
 
     return overall_mean
-
+'''
 # =============================================================================
 # FUNÇÕES DE CÁLCULO DE BENEFÍCIOS
 # =============================================================================
@@ -405,8 +463,10 @@ def generate_allocation(tutors_file, schools_file, params_dict):
         # --- Carregar Dados ---
         tutors, availability, preferences, rankings, total_tutors = read_tutors(tutors_file, shift_mode)
         schools, vacancies, total_schools, total_vacancies = read_schools(schools_file, shift_mode)
+
+        active_schools = list({s for (slot, s), v in vacancies.items() if v > 0})
         distances = read_distances()
-        DISTANCE_MEAN = calculate_mean_distances() # Calcula a média de 'distancias.csv'
+        DISTANCE_MEAN = calculate_mean_distances(active_schools)  # Calcula a média de cdistancias entre escolas
 
         # --- Calcular Benefícios ---
         benefits = calculate_benefits(
@@ -467,7 +527,7 @@ def generate_allocation(tutors_file, schools_file, params_dict):
         # Converte a lista de resultados em um DataFrame
         df_allocation = pd.DataFrame(results_list)
 
-        # --- CÁLCULO DAS ESTATÍSTICAS ---
+        # --- Cálculo das Estatísticas ---
         stats = {
             "total_tutors": total_tutors,
             "total_schools": total_schools,
