@@ -4,7 +4,8 @@ import numpy as np
 import time
 import csv
 from PIL import Image
-import optimization as optimization
+import optimization as opt
+import metrics as met
 
 st.set_page_config(
     page_title="Otimização da Alocação de Tutores CODE",
@@ -29,28 +30,25 @@ def show_file_stats(t_file, s_file, shift_mode_label):
     """
     Lê os arquivos carregados para exibir estatísticas rápidas na tela de configuração.
     """
-    # Traduz o label do radio button para o código interno que o core espera
     if shift_mode_label == 'Dias e Turnos (10 colunas)':
         shift_mode = 'days_shifts'
     else:
         shift_mode = 'shifts'
     
-    # Colunas para exibir as métricas lado a lado
     c1, c2 = st.columns(2)
 
     if t_file:
         try:
-            # Chama a função de leitura do core apenas para pegar a contagem (n_tutors)
-            # Nota: A função read_tutors do core já faz o seek(0) para não estragar o arquivo
-            _, _, _, _, n_tutors = optimization.read_tutors(t_file, shift_mode)
+            # CORRIGIDO: Agora tem 5 underlines para ignorar os 5 primeiros valores e pegar o 6º (n_tutors)
+            _, _, _, _, _, n_tutors = opt.read_tutors(t_file, shift_mode)
             c1.info(f"✅ **{n_tutors}** Tutores importados")
         except Exception as e:
             c1.error(f"Erro no arquivo de Tutores: {e}")
 
     if s_file:
         try:
-            # Chama a função de leitura do core para pegar escolas e vagas
-            _, _, n_schools, n_vacancies = optimization.read_schools(s_file, shift_mode)
+            # CORRIGIDO: Agora tem 3 underlines para ignorar os 3 primeiros e pegar os dois últimos
+            _, _, _, n_schools, n_vacancies = opt.read_schools(s_file, shift_mode)
             c2.info(f"✅ **{n_schools}** Escolas importadas, com **{n_vacancies}** vagas totais")
         except Exception as e:
             c2.error(f"Erro no arquivo de Escolas: {e}")
@@ -81,120 +79,120 @@ if st.session_state.current_page == "home":
         # Adicionando imagem do projeto CODE
         try:
             banner = Image.open("code-programacao.png")
-            st.image(banner, width="stretch")
+            st.image(banner, use_container_width=True)
         except FileNotFoundError:
             st.error("Imagem do projeto não encontrada!")
 
         st.markdown("<h1 style='text-align: center; color: #eb8334;'>Otimização da Alocação de Tutores CODE</h1>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center;'>Uma ferramenta que otimiza a alocação dos tutores às escolas do projeto.</p>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center;'>Importe as planilhas de Tutores e Escolas, salve as configurações e clique em Otimizar para gerar o resultado da alocação.</p>", unsafe_allow_html=True)
-        #st.markdown("<p style='text-align: center;'>Projeto de Trabalho de Conclusão de Curso do discente Ezequiel Teotônio Jó.</p>", unsafe_allow_html=True)
 
         # Dividindo para centralizar o botão
         btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 1]) 
 
         with btn_col2:
-            with st.container(horizontal_alignment="center",):
+            with st.container(horizontal_alignment="center"):
                 btn_col2_1, btn_col2_2 = st.columns([1, 1])
 
                 with btn_col2_1:
-                    if st.button("Importar dados", width="content"):
+                    if st.button("Importar dados", use_container_width=True):
                         st.session_state.current_page = 'config'
                         st.rerun()
 
                 with btn_col2_2:
-                    if st.button("Otimizar", width="content"):
-                        #  Verificar se a configuração foi salva
+                    if st.button("Otimizar", use_container_width=True, type="primary"):
                         if not st.session_state.get("saved_config", False):
                             st.warning("Por favor, importe os dados e salve as configurações primeiro.")
                         else:
                             try:
-                                # Mostrar o spinner e rodar a otimização
                                 with st.spinner("Otimizando... Isso pode levar alguns segundos."):
                                     
-                                    # Pegar dados da sessão
                                     t_file = st.session_state.tutors_file
                                     s_file = st.session_state.schools_file
                                     params = st.session_state.params
                                     
-                                    # Chamar a função de otimização
-                                    result_dict = optimization.generate_allocation(t_file, s_file, params)
-
-                                    # Salvar o resultado completo na sessão
-                                    st.session_state.optimization_result = result_dict
+                                    # Lendo o arquivo diretamente do repositório local
+                                    d_file = "distancias.csv" 
                                     
-                                    # Salvar o DataFrame na variável que a tabela espera
-                                    st.session_state.df_allocation_result = result_dict["dataframe"]
+                                    # Chamando o motor
+                                    result_dict = opt.generate_allocation(t_file, s_file, d_file, params)
+                                    
+                                    df_alocacao = result_dict["dataframe"]
+                                    raw_data = result_dict["raw_data"]
+
+                                    # Calculando as métricas extras
+                                    metricas = met.get_summary_metrics(df_alocacao, raw_data)
+
+                                    st.session_state.optimization_result = result_dict
+                                    st.session_state.df_allocation_result = df_alocacao
+                                    st.session_state.df_unallocated = metricas["unallocated"]
+                                    st.session_state.df_unfilled = metricas["unfilled_vacancies"]
+                                    
                                     st.session_state.optimization_done = True
                                     st.success("Otimização concluída!", icon="✅")
 
                             except Exception as e:
-                                # Capturar e exibir qualquer erro que ocorra
                                 st.error(f"Erro durante a otimização: {e}")
-                                # st.exception(e)
 
-        # Verificar o st.session_state, não a variável local
+        # --- EXIBIÇÃO DOS RESULTADOS ---
         if st.session_state.get("optimization_done", False):
 
-            # Recupera o dicionário de resultados
             res = st.session_state.optimization_result
-            df = res["dataframe"]
             stats = res["stats"]
 
             st.markdown("---")
             st.subheader("📊 Estatísticas da Alocação")
             
-            # 4 Colunas para métricas (Dashboard)
             m1, m2, m3, m4 = st.columns(4)
             
             m1.metric("Tutores Inscritos", stats["total_tutors"])
             m2.metric("Escolas Disponíveis", stats["total_schools"])
             m3.metric("Vagas Totais", stats["total_vacancies"])
             
-            # Lógica para a cor do delta (Vagas preenchidas)
             vagas_ocupadas = stats["filled_vacancies"]
             vagas_totais = stats["total_vacancies"]
             if vagas_ocupadas < vagas_totais:
                 delta_msg = f"{vagas_totais - vagas_ocupadas} vagas ociosas"
-                delta_color = "off" # Cinza/Normal
+                delta_color = "off"
             else:
                 delta_msg = "Todas preenchidas!"
-                delta_color = "normal" # Verde
+                delta_color = "normal"
 
             m4.metric("Vagas Preenchidas", vagas_ocupadas, delta=delta_msg, delta_color=delta_color)
 
             st.markdown("---")
-            st.markdown("### 📋 Lista de Alocação")
+            st.markdown("### 📋 Resultados Detalhados")
 
-            try:
-                # Ler o DataFrame salvo na sessão
+            aba1, aba2, aba3 = st.tabs(["✅ Alocações", "❌ Não Alocados", "⚠️ Vagas Remanescentes"])
+
+            with aba1:
                 allocation = st.session_state.df_allocation_result
-                
                 if allocation.empty:
-                    st.info("O modelo foi executado, mas nenhuma alocação foi possível com os dados e restrições fornecidos.")
+                    st.info("Nenhuma alocação foi possível com os dados e restrições fornecidos.")
                 else:
-                    st.dataframe(allocation)
+                    st.dataframe(allocation, use_container_width=True, hide_index=True)
                     
-                    # Adicionar um botão de download
-                    @st.cache_data
-                    def convert_df_to_csv(df):
-                        # Converte o DataFrame para CSV em memória
-                        return df.to_csv(index=False).encode('utf-8')
-
-                    csv_data = convert_df_to_csv(allocation)
-                    
+                    csv_data = allocation.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         label="Baixar alocação como CSV",
                         data=csv_data,
                         file_name="alocacao_final.csv",
                         mime="text/csv",
                     )
+            
+            with aba2:
+                df_nao_alocados = st.session_state.df_unallocated
+                if df_nao_alocados.empty:
+                    st.success("Excelente! Todos os tutores foram alocados em alguma vaga.")
+                else:
+                    st.dataframe(df_nao_alocados, use_container_width=True, hide_index=True)
                     
-            except AttributeError:
-                # Isso pode acontecer se 'optimization_done' for True mas 'df_allocation_result' não existir
-                st.error("Erro ao carregar os resultados. Tente otimizar novamente.")
-            except Exception as e:
-                st.error(f"Erro ao exibir resultados: {e}")
+            with aba3:
+                df_vagas = st.session_state.df_unfilled
+                if df_vagas.empty:
+                    st.success("Perfeito! Todas as vagas ofertadas pelas escolas foram preenchidas.")
+                else:
+                    st.dataframe(df_vagas, use_container_width=True, hide_index=True)
 
 # ------------------ CONFIGURAÇÕES ------------------
 if st.session_state.current_page == "config":

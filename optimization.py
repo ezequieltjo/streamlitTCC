@@ -10,41 +10,48 @@ distance_matrix = 'distancias.csv'
 # FUNÇÕES DE LEITURA DE ARQUIVOS
 # =============================================================================
 
-def read_tutors(tutors_file_object, shift_mode):
+def read_tutors(file_input, shift_mode):
     """
-    Lê o OBJETO DE ARQUIVO CSV (vindo do Streamlit) de tutores com disponibilidade e preferências.
+    Lê os dados dos tutores aceitando tanto o caminho do arquivo (string para rodar localmente) 
+    quanto o objeto de arquivo (BytesIO do Streamlit).
 
     Estrutura esperada do CSV:
     - Coluna 1: 'Tutor' - Identificador único do tutor (ex: 'T1', 'T2')
     - Coluna 2: 'Ranking' - Classificação no processo seletivo (inteiro)
-    - Colunas 3-12: Disponibilidade em 10 turnos (binário 0/1):
-      * Formato: <Dia>_<Turno> (ex: 'Segunda_Manha', 'Terca_Tarde')
-      * Dias: Segunda, Terca, Quarta, Quinta, Sexta
-      * Turnos: Manha, Tarde
-    - Colunas 13-15: 'Preferencia1', 'Preferencia2', 'Preferencia3' - Escolas preferidas em ordem
-
-    Exemplo de linha:
-    Tutor,Ranking,Segunda_Manha,...,Sexta_Tarde,Preferencia1,Preferencia2,Preferencia3
-    T1,1,1,0,...,1,EscolaA,EscolaB,EscolaC
+    - Colunas de Vagas: <Dia>_<Turno> ou <Turno> (binário 0/1)
+    - Colunas de Preferência: 'Preferencia1', 'Preferencia2', 'Preferencia3'
+    - Coluna Opcional: 'Polos' - Distritos desejados separados por vírgula
 
     Retorna:
-    - Lista de tutores: ['T1', 'T2', ...]
-    - Dicionário de disponibilidade: {(tutor, turno): 0/1}
-    - Dicionário de preferências: {tutor: [escola1, escola2, escola3]}
-    - Dicionário de rankings: {tutor: ranking}
+    - tutors: Lista de tutores
+    - availability: Dicionário {(tutor, turno): 0/1}
+    - preferences: Dicionário {tutor: [escola1, escola2, escola3]}
+    - rankings: Dicionário {tutor: ranking}
+    - tutor_districts: Dicionário {tutor: ['PoloA', 'PoloB']}
+    - total_tutors: Quantidade total de tutores lidos (int)
     """
-
     tutors = []
     availability = {}
     preferences = {}
     rankings = {}
+    tutor_districts = {}
+
+    # --- LÓGICA HÍBRIDA ---
+    if isinstance(file_input, str):
+        # Rodando localmente: abre o arquivo pelo caminho
+        f = open(file_input, 'r', encoding='utf-8')
+        should_close = True
+        reader_source = f
+    else:
+        # Rodando no Streamlit: usa o objeto em memória
+        file_input.seek(0)                                      # Rebobina o arquivo
+        content = file_input.read().decode('utf-8')             # Decodifica
+        f = io.StringIO(content)                                # Cria o StringIO
+        should_close = False
+        reader_source = f
 
     try:
-        tutors_file_object.seek(0)              # Rebobina o arquivo para garantir leitura do início        
-        content = tutors_file_object.read().decode('utf-8')        # Decodifica o conteúdo do arquivo
-        f = io.StringIO(content)                      # Cria um objeto StringIO para o csv.DictReader
-
-        reader = csv.DictReader(f)
+        reader = csv.DictReader(reader_source)
             
         for row in reader:
             tutor = row['Tutor'].strip()
@@ -59,59 +66,78 @@ def read_tutors(tutors_file_object, shift_mode):
                 shifts_per_day = ['Manha', 'Tarde']
                 time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
 
-                # Map availability for all time slots in 'days_shifts' mode
                 for time_slot in time_slots:
                     # Usa .get() para segurança e trata strings vazias como '0'
                     slot_val = row.get(time_slot, '0')
                     availability[(tutor, time_slot)] = int(slot_val if slot_val else '0')
 
             elif shift_mode == 'shifts':
-                    # Map availability for 'shifts' mode (Manha, Tarde)
                 for time_slot in ['Manha', 'Tarde']:
                     slot_val = row.get(time_slot, '0')
                     availability[(tutor, time_slot)] = int(slot_val if slot_val else '0')
-                
+            
             # Usa .get() para evitar erros caso as colunas de preferência não existam
             preferences[tutor] = [
                 row.get('Preferencia1'),
                 row.get('Preferencia2'),
                 row.get('Preferencia3')
             ]
+
+            district_str = row.get('Polos', '').strip()
+            if district_str:
+                tutor_districts[tutor] = [p.strip() for p in district_str.split(',')]
+            else:
+                tutor_districts[tutor] = []
     
     except Exception as e:
-        # Relança um erro claro que o Streamlit pode capturar e exibir com st.error()
+        # Relança um erro claro que o Streamlit ou console podem capturar
         raise ValueError(f"Erro ao ler o arquivo de tutores: {e}. Verifique o formato do CSV.")
         
-    return tutors, availability, preferences, rankings, len(tutors)
+    finally:
+        # Garante fechamento apenas se o arquivo foi aberto fisicamente
+        if should_close:
+            f.close()
 
-def read_schools(schools_file_object, shift_mode):
+    return tutors, availability, preferences, rankings, tutor_districts, len(tutors)
+
+def read_schools(file_input, shift_mode):
     """
-    Lê o OBJETO DE ARQUIVO CSV (vindo do Streamlit) de escolas com vagas por turno.
+    Lê os dados das escolas aceitando tanto o caminho do arquivo (string para rodar localmente) 
+    quanto o objeto de arquivo (BytesIO do Streamlit).
 
     Estrutura esperada do CSV:
     - Coluna 1: 'Escola' - Nome da escola (ex: 'EscolaA', 'EscolaB')
-    - Colunas 2-11: Vagas em 10 turnos (inteiro ≥ 0):
-      * Mesmo formato de turnos dos tutores: <Dia>_<Turno>
-
-    Exemplo de linha:
-    Escola,Segunda_Manha,...,Sexta_Tarde
-    EscolaA,2,1,...,0
+    - Coluna: 'Polo' - Distrito/Região da escola
+    - Colunas de Vagas: <Dia>_<Turno> ou apenas <Turno>
 
     Retorna:
-    - Lista de escolas: ['EscolaA', 'EscolaB', ...]
-    - Dicionário de vagas: {(turno, escola): quantidade}
+    - schools: Lista de escolas
+    - vacancies: Dicionário de vagas {(turno, escola): quantidade}
+    - school_districts: Dicionário mapeando a escola ao seu polo
+    - total_schools: Quantidade total de escolas lidas
+    - total_vacancies: Somatório de todas as vagas encontradas
     """
 
     schools = []
     vacancies = {}
+    school_districts = {}
     total_vacancies = 0
-    
-    try:
-        schools_file_object.seek(0)              # Rebobina o arquivo para garantir leitura do início        
-        content = schools_file_object.read().decode('utf-8')        # Decodifica o conteúdo do arquivo
-        f = io.StringIO(content)                      # Cria um objeto StringIO para o csv.DictReader
 
-        reader = csv.DictReader(f)
+    if isinstance(file_input, str):
+        # Rodando localmente: abre o arquivo pelo caminho
+        f = open(file_input, 'r', encoding='utf-8')
+        should_close = True
+        reader_source = f
+    else:
+        # Rodando no Streamlit: usa o objeto em memória
+        file_input.seek(0)                                      # Rebobina o arquivo
+        content = file_input.read().decode('utf-8')             # Decodifica
+        f = io.StringIO(content)                                # Cria o StringIO
+        should_close = False
+        reader_source = f
+
+    try:
+        reader = csv.DictReader(reader_source)
             
         for row in reader:
             # Usa .get() para evitar erro se a coluna 'Escola' não existir
@@ -121,13 +147,15 @@ def read_schools(schools_file_object, shift_mode):
                 
             schools.append(school)
 
+            district = row.get('Polo', '').strip()
+            school_districts[school] = district
+
             if shift_mode == 'days_shifts':
                 days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
                 shifts_per_day = ['Manha', 'Tarde']
                 time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
 
                 for time_slot in time_slots:
-                    # Usa .get() para segurança e trata strings vazias como '0'
                     slot_val = row.get(time_slot, '0')
                     val = int(slot_val if slot_val else '0')
                     vacancies[(time_slot, school)] = val
@@ -141,112 +169,122 @@ def read_schools(schools_file_object, shift_mode):
                     total_vacancies += val
     
     except Exception as e:
-        # Relança um erro claro que o Streamlit pode capturar e exibir com st.error()
+        # Relança um erro claro que o Streamlit ou o console podem capturar
         raise ValueError(f"Erro ao ler o arquivo de escolas: {e}. Verifique o formato do CSV.")
+        
+    finally:
+        # Garante fechamento apenas se o arquivo foi aberto fisicamente pelo código local
+        if should_close:
+            f.close()
     
-    return schools, vacancies, len(schools), total_vacancies
+    return schools, vacancies, school_districts, len(schools), total_vacancies
 
-def read_distances():
+def read_distances(file_input):
     """
-    Lê a matriz de distâncias (arquivo 'distancias.csv' local) entre escolas.
+    Lê a matriz de distâncias entre escolas, aceitando tanto o caminho do arquivo (string) 
+    quanto o objeto de arquivo (BytesIO do Streamlit).
 
     Estrutura esperada do CSV:
     - Linha 1 (cabeçalho): Escolas na ordem de referência 
-    * Formato: ,SchoolA,SchoolB,SchoolC (primeira célula vazia)
+      * Formato: ,SchoolA,SchoolB,SchoolC (primeira célula vazia)
     - Linhas subsequentes: 
-    * Coluna 1: Nome da escola de origem
-    * Demais colunas: Distância para escola do cabeçalho (número)
-
-    Exemplo:
-    ,SchoolA,SchoolB,SchoolC
-    SchoolA,0,5,8
-    SchoolB,5,0,6
-    SchoolC,8,6,0
+      * Coluna 1: Nome da escola de origem
+      * Demais colunas: Distância para escola do cabeçalho (número)
 
     Retorna:
-    - Dicionário de distâncias: {(origem, destino): valor}
-    * Ex: distancias[('SchoolA','SchoolB')] = 5
-
-    Notas:
-    - A ordem das escolas no cabeçalho e primeira coluna deve ser idêntica
+    - distances: Dicionário de distâncias {(origem, destino): valor}
     """
-
     distances = {}
-    filename = distance_matrix
+
+    if isinstance(file_input, str):
+        # Rodando localmente: abre o arquivo pelo caminho
+        f = open(file_input, 'r', encoding='utf-8')
+        should_close = True
+        reader_source = f
+    else:
+        # Rodando no Streamlit: usa o objeto em memória
+        file_input.seek(0)
+        content = file_input.read().decode('utf-8')
+        f = io.StringIO(content)
+        should_close = False
+        reader_source = f
 
     try:
-        with open(filename, 'r', encoding='utf-8') as f:
-            reader = csv.reader(f)
-            
-            try:
-                # Lê o cabeçalho (lista de escolas)
-                header = next(reader)
-                schools = [s.strip() for s in header[1:]]
-            except StopIteration:
-                raise ValueError(f"O arquivo '{filename}' está vazio.")
-            
-            # Processa cada linha da matriz
-            for row in reader:
-                if not row:     # Pula linhas vazias
-                    continue
-                
-                origin_school = row[0].strip()
-                for idx, distance_str in enumerate(row[1:]):
-                    
-                    # Garante que não tente ler além do número de escolas do cabeçalho
-                    if idx < len(schools):
-                        target_school = schools[idx]
-                        
-                        # Converte o valor da distância
-                        distance_val = distance_str.strip()
-                        if distance_val:
-                            distances[(origin_school, target_school)] = (
-                                float(distance_val) if '.' in distance_val else int(distance_val)
-                            )
-                        else:
-                            # Trata caso de célula vazia como distância 0 ou indefinida
-                            distances[(origin_school, target_school)] = 0 
-    
-    except FileNotFoundError:
-        # Informa se o arquivo não foi encontrado no repositório
-        raise FileNotFoundError(
-            f"ERRO: O arquivo '{filename}' não foi encontrado. "
-            "Certifique-se de que ele esteja no mesmo diretório do seu script."
-        )
-    except Exception as e:
-        # Captura outros erros
-        raise ValueError(f"Erro ao processar o arquivo de distâncias '{filename}': {e}")
+        reader = csv.reader(reader_source)
         
+        try:
+            # Lê o cabeçalho (lista de escolas)
+            header = next(reader)
+            schools = [s.strip() for s in header[1:]]
+        except StopIteration:
+            raise ValueError("O arquivo de distâncias está vazio.")
+        
+        # Processa cada linha da matriz
+        for row in reader:
+            if not row:     # Pula linhas vazias
+                continue
+            
+            origin_school = row[0].strip()
+            for idx, distance_str in enumerate(row[1:]):
+                
+                # Garante que não tente ler além do número de escolas do cabeçalho
+                if idx < len(schools):
+                    target_school = schools[idx]
+                    
+                    # Converte o valor da distância
+                    distance_val = distance_str.strip()
+                    if distance_val:
+                        distances[(origin_school, target_school)] = (
+                            float(distance_val) if '.' in distance_val else int(distance_val)
+                        )
+                    else:
+                        # Trata caso de célula vazia como distância 0 ou indefinida
+                        distances[(origin_school, target_school)] = 0 
+    
+    except Exception as e:
+        # Captura outros erros e envia para o Streamlit/Console
+        raise ValueError(f"Erro ao processar o arquivo de distâncias: {e}")
+        
+    finally:
+        # Garante fechamento apenas se o arquivo foi aberto fisicamente
+        if should_close:
+            f.close()
+            
     return distances
 
-def calculate_mean_distances(active_schools):
+def calculate_mean_distances(file_input, active_schools):
     """
-    Lê a matriz de distâncias ('distancias.csv') e calcula a média dinamicamente.
+    Lê a matriz de distâncias e calcula a média dinamicamente.
+    Aceita tanto o caminho do arquivo (string) quanto o objeto em memória (Streamlit).
     Considera apenas as escolas presentes na lista 'active_schools'.
     
     Args:
-    - active_schools: Lista de strings com os nomes das escolas que têm vagas > 0.
+    - file_input: Caminho do arquivo ou objeto BytesIO/StringIO.
+    - active_schools: Lista de strings com os nomes das escolas ativas.
 
     Retorna:
-    - A média (float) das distâncias > 0 entre as escolas ativas.
+    - distances_mean: A média (float) das distâncias > 0 entre as escolas ativas.
     """
-
-    filename = distance_matrix  
     distances_mean = 0.0
 
-    print(f"--- Calculando média de distância dinâmica ---")
-    print(f"Escolas com vagas neste cenário: {len(active_schools)}")
+    #print(f"--- Calculando média de distância dinâmica ---")
+    #print(f"Escolas ativas neste cenário: {len(active_schools)}")
+
+    # --- LÓGICA HÍBRIDA (Super simples graças ao Pandas) ---
+    if not isinstance(file_input, str):
+        file_input.seek(0) # Rebobina o arquivo se for um upload do Streamlit
 
     try:
-        df = pd.read_csv(filename, index_col=0)
+        # O Pandas lê diretamente tanto do disco quanto da memória!
+        df = pd.read_csv(file_input, index_col=0)
         
         # Identifica escolas que estão na lista de vagas mas NÃO estão na matriz
         missing_schools = [e for e in active_schools if e not in df.index]
         
         if len(missing_schools) > 0:
-            print(f"⚠️ ATENÇÃO: {len(missing_schools)} escolas com vagas NÃO foram encontradas na matriz de distâncias:")
-            for school in missing_schools:
-                print(f"   -> {school}")
+            print(f"⚠️ ATENÇÃO: {len(missing_schools)} escolas ativas NÃO foram encontradas na matriz de distâncias.")
+            # Descomente a linha abaixo se quiser ver os nomes das escolas faltando
+            # for school in missing_schools: print(f"   -> {school}")
 
         # Interseção: escolas que estão 'ativas' E que existem na matriz
         valid_schools = [e for e in active_schools if e in df.index]
@@ -255,7 +293,7 @@ def calculate_mean_distances(active_schools):
             print(f"Matriz filtrada para {len(valid_schools)} x {len(valid_schools)} escolas.")
             df = df.loc[valid_schools, valid_schools]
         else:
-            print("AVISO: Menos de 2 escolas ativas encontradas na matriz. Usando matriz completa para o cálculo.")
+            print("AVISO: Menos de 2 escolas ativas na matriz. Usando matriz completa.")
         
         # Filtra distâncias maiores que zero
         relevant_distances = df.stack()
@@ -263,51 +301,18 @@ def calculate_mean_distances(active_schools):
         
         if not relevant_distances.empty:
             distances_mean = relevant_distances.mean()
-            print(f"DISTANCE_MEAN = {distances_mean:.2f}")
+            print(f"Distancia Média entre escolas dessa instância = {distances_mean:.2f}")
         else:
             print("Nenhuma distância válida encontrada > 0. Retornando 0.")
             
     except FileNotFoundError:
-        raise FileNotFoundError(
-            f"ERROR: The distance file '{filename}' was not found. "
-            "Check if it is in the repository."
-        )
+        # Mantido para caso file_input seja uma string de um caminho incorreto
+        raise FileNotFoundError("ERRO: O arquivo de distâncias não foi encontrado.")
     except Exception as e:
-        raise ValueError(f"An error occurred while reading the distance file: {e}")
+        raise ValueError(f"Erro ao processar o arquivo de distâncias para calcular a média: {e}")
 
     return distances_mean
-'''
-def calculate_mean_distances():
-    """
-    Lê a matriz de distâncias ('distancias.csv') e calcula a média geral.
 
-    Retorna:
-    - A média (float) de todas as distâncias > 0.
-    """
-
-    filename = distance_matrix  
-    overall_mean = 0.0
-
-    try:
-        df = pd.read_csv(filename, index_col=0)
-        
-        # Empilha a matriz para uma única coluna e filtra distâncias maiores que zero
-        relevant_distances = df.stack()
-        relevant_distances = relevant_distances[relevant_distances > 0]
-        
-        if not relevant_distances.empty:
-            overall_mean = relevant_distances.mean()
-            
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            f"ERROR: The distance file '{filename}' was not found. "
-            "Check if it is in the repository."
-        )
-    except Exception as e:
-        raise ValueError(f"An error occurred while reading the distance file: {e}")
-
-    return overall_mean
-'''
 # =============================================================================
 # FUNÇÕES DE CÁLCULO DE BENEFÍCIOS
 # =============================================================================
@@ -393,29 +398,29 @@ def calculate_benefits(tutors, schools, preferences, distances, rankings,
     
     return benefits
 
-def extract_allocation_results(model, tutors, time_slots, schools):
+def extract_allocation_results(X_dict):
     """
-    Extrai as alocações do modelo otimizado e retorna uma lista de dicionários.
-    (Baseado em 'save_allocation_results' mas sem salvar em arquivo).
+    Extrai as alocações do dicionário de variáveis do modelo otimizado.
+    Retorna uma lista de dicionários com os resultados.
+    
+    Args:
+    - X_dict: Dicionário contendo as variáveis de decisão do MIP. 
+    O formato esperado das chaves é uma tupla: (tutor, time_slot, school)
     """
     results = []
     
-    # Coletar alocações válidas
-    for tutor in tutors:
-        for time_slot in time_slots:
-            for school in schools:
-                
-                # Tenta encontrar a variável de decisão pelo nome
-                var_name = f'X_{tutor}_{time_slot}_{school}'
-                var = model.var_by_name(var_name)
-                
-                # Verifica se a variável existe e se foi selecionada (valor ~1)
-                if var is not None and var.x >= 0.99:
-                    results.append({
-                        'Escola': school,
-                        'Turno da Vaga': time_slot,
-                        'Tutor Alocado': tutor
-                    })
+    # Itera diretamente sobre o dicionário de variáveis criadas no modelo
+    for keys, var in X_dict.items():
+        # Desempacota a tupla da chave
+        tutor, time_slot, school = keys
+        
+        # Verifica se a variável foi selecionada (valor ~1) pelo algoritmo
+        if var.x >= 0.99:
+            results.append({
+                'Escola': school,
+                'Turno da Vaga': time_slot,
+                'Tutor Alocado': tutor
+            })
     
     return results
 
@@ -423,24 +428,23 @@ def extract_allocation_results(model, tutors, time_slots, schools):
 # FUNÇÃO PRINCIPAL DA OTIMIZAÇÃO
 # =============================================================================
 
-def generate_allocation(tutors_file, schools_file, params_dict):
+def generate_allocation(tutors_file, schools_file, distances_file, params_dict):
     """
     Função mestra que executa todo o processo de otimização.
     
     Recebe:
-    - tutors_file: O objeto de arquivo CSV dos tutores (do st.file_uploader)
-    - schools_file: O objeto de arquivo CSV das escolas (do st.file_uploader)
+    - tutors_file: O objeto de arquivo CSV dos tutores (ou string de caminho)
+    - schools_file: O objeto de arquivo CSV das escolas (ou string de caminho)
+    - distances_file: O objeto ou caminho do arquivo da matriz de distâncias
     - params_dict: Um dicionário com todos os parâmetros da página de config
     
     Retorna:
-    - Um DataFrame do Pandas com a alocação final.
+    - Um dicionário contendo o DataFrame final, as estatísticas e os dados puros (raw_data).
     """
     
     try:
         # --- Definir Parâmetros de Turno ---
-        # Pega o 'shift_mode' que veio do params_dict.
-        # Usa 'days_shifts' (dias e turnos) como padrão se nada for definido.
-        shift_mode = params_dict.get('shift_mode') 
+        shift_mode = params_dict.get('shift_mode', 'days_shifts') 
 
         if shift_mode == 'days_shifts':
             days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
@@ -461,12 +465,14 @@ def generate_allocation(tutors_file, schools_file, params_dict):
         SIGMOID_SCALE = params_dict.get('sigmoidCurve', 2000)
 
         # --- Carregar Dados ---
-        tutors, availability, preferences, rankings, total_tutors = read_tutors(tutors_file, shift_mode)
-        schools, vacancies, total_schools, total_vacancies = read_schools(schools_file, shift_mode)
+        tutors, availability, preferences, rankings, tutor_districts, total_tutors = read_tutors(tutors_file, shift_mode)
+        schools, vacancies, school_districts, total_schools, total_vacancies = read_schools(schools_file, shift_mode)
 
         active_schools = list({s for (slot, s), v in vacancies.items() if v > 0})
-        distances = read_distances()
-        DISTANCE_MEAN = calculate_mean_distances(active_schools)  # Calcula a média de cdistancias entre escolas
+        
+        # Agora passamos o arquivo de distâncias como parâmetro
+        distances = read_distances(distances_file)
+        DISTANCE_MEAN = calculate_mean_distances(distances_file, active_schools) 
 
         # --- Calcular Benefícios ---
         benefits = calculate_benefits(
@@ -489,48 +495,52 @@ def generate_allocation(tutors_file, schools_file, params_dict):
         model.threads = 1  # Força o uso de apenas 1 núcleo do processador
         model.seed = 37    # Fixa a semente matemática para os desempates e heurísticas
 
-        X = {
-            (t, time_slot, s): model.add_var(name=f'X_{t}_{time_slot}_{s}', var_type=BINARY)
-            for t in tutors
-            for time_slot in time_slots
-            for s in schools
-        }
+        # Dicionário de variáveis (X)
+        X = {}
+        for t in tutors:
+            for time_slot in time_slots:
+                for s in schools:
+                    # OTIMIZAÇÃO DE VELOCIDADE E MEMÓRIA:
+                    # Só cria a variável de decisão se o tutor tem disponibilidade E a escola tem vaga.
+                    if availability.get((t, time_slot), 0) > 0 and vacancies.get((time_slot, s), 0) > 0:
+                        X[(t, time_slot, s)] = model.add_var(var_type=BINARY)
 
         # Restrição 1: Cada tutor em no máximo um turno/escola
         for t in tutors:
-            model += xsum(X[t, time_slot, s] for time_slot in time_slots for s in schools) <= 1
+            # Pega apenas as variáveis que existem para este tutor
+            vars_tutor = [X[k] for k in X if k[0] == t]
+            if vars_tutor:
+                model += xsum(vars_tutor) <= 1
 
         # Restrição 2: Respeitar vagas das escolas
         for time_slot in time_slots:
             for s in schools:
-                model += xsum(X[t, time_slot, s] for t in tutors) <= vacancies.get((time_slot, s), 0)
+                # Pega apenas as variáveis que existem para esta escola e turno
+                vars_escola_turno = [X[k] for k in X if k[1] == time_slot and k[2] == s]
+                if vars_escola_turno:
+                    model += xsum(vars_escola_turno) <= vacancies.get((time_slot, s), 0)
 
         # Restrição 3: Respeitar disponibilidade dos tutores
-        for t in tutors:
-            for time_slot in time_slots:
-                for s in schools:
-                    model += X[t, time_slot, s] <= availability.get((t, time_slot), 0)
+        for keys, var in X.items():
+            t, time_slot, s = keys
+            model += var <= availability.get((t, time_slot), 0)
 
         # Função Objetivo
         model.objective = xsum(
-            benefits[t, s] * X[t, time_slot, s]
-            for t in tutors
-            for time_slot in time_slots
-            for s in schools
+            benefits.get((keys[0], keys[2]), 0) * var
+            for keys, var in X.items()
         )
         
         # Resolver o modelo
         model.optimize()
 
         # --- Extrair e Retornar os Resultados ---  
-        results_list = extract_allocation_results(model, tutors, time_slots, schools)
+        results_list = extract_allocation_results(X)
 
         if not results_list:
-            # Retorna um DataFrame vazio se nenhuma alocação for feita
-            return pd.DataFrame(columns=['Escola', 'Turno da Vaga', 'Tutor Alocado'])
-        
-        # Converte a lista de resultados em um DataFrame
-        df_allocation = pd.DataFrame(results_list)
+            df_allocation = pd.DataFrame(columns=['Escola', 'Turno da Vaga', 'Tutor Alocado'])
+        else:
+            df_allocation = pd.DataFrame(results_list)
 
         # --- Cálculo das Estatísticas ---
         stats = {
@@ -542,8 +552,20 @@ def generate_allocation(tutors_file, schools_file, params_dict):
 
         return {
             "dataframe": df_allocation,
-            "stats": stats
+            "stats": stats,
+            "raw_data": {
+                "tutors": tutors,
+                "schools": schools,               
+                "time_slots": time_slots,
+                "vacancies": vacancies,
+                "rankings": rankings,
+                "preferences": preferences,
+                "availability": availability,
+                "distances": distances,
+                "tutor_districts": tutor_districts,
+                "school_districts": school_districts
+            }
         }
 
     except Exception as e:
-        raise e
+        raise ValueError(f"Erro ao processar a otimização: {e}")
