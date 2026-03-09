@@ -1,8 +1,4 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
-import time
-import csv
 from PIL import Image
 import optimization as opt
 import metrics as met
@@ -79,7 +75,7 @@ if st.session_state.current_page == "home":
         # Adicionando imagem do projeto CODE
         try:
             banner = Image.open("code-programacao.png")
-            st.image(banner, use_container_width=True)
+            st.image(banner, width="stretch")
         except FileNotFoundError:
             st.error("Imagem do projeto não encontrada!")
 
@@ -95,44 +91,47 @@ if st.session_state.current_page == "home":
                 btn_col2_1, btn_col2_2 = st.columns([1, 1])
 
                 with btn_col2_1:
-                    if st.button("Importar dados", use_container_width=True):
+                    if st.button("Importar dados", width="stretch"):
                         st.session_state.current_page = 'config'
                         st.rerun()
 
                 with btn_col2_2:
-                    if st.button("Otimizar", use_container_width=True, type="primary"):
-                        if not st.session_state.get("saved_config", False):
-                            st.warning("Por favor, importe os dados e salve as configurações primeiro.")
-                        else:
-                            try:
-                                with st.spinner("Otimizando... Isso pode levar alguns segundos."):
-                                    
-                                    t_file = st.session_state.tutors_file
-                                    s_file = st.session_state.schools_file
-                                    params = st.session_state.params
-                                    
-                                    # Lendo o arquivo diretamente do repositório local
-                                    d_file = "distancias.csv" 
-                                    
-                                    # Chamando o motor
-                                    result_dict = opt.generate_allocation(t_file, s_file, d_file, params)
-                                    
-                                    df_alocacao = result_dict["dataframe"]
-                                    raw_data = result_dict["raw_data"]
+                    # 1. Apenas guardamos se o botão foi clicado (True ou False)
+                    clicou_otimizar = st.button("Otimizar", width="stretch", type="primary")
 
-                                    # Calculando as métricas extras
-                                    metricas = met.get_summary_metrics(df_alocacao, raw_data)
+            # 2. Toda a lógica vem para FORA de btn_col2_1 e btn_col2_2, 
+            # mas continua centralizada abaixo deles!
+            if clicou_otimizar:
+                if not st.session_state.get("saved_config", False):
+                    st.warning("Por favor, importe os dados e salve as configurações primeiro.")
+                else:
+                    try:
+                        with st.spinner("Otimizando... Isso pode levar alguns segundos."):
+                            
+                            t_file = st.session_state.tutors_file
+                            s_file = st.session_state.schools_file
+                            params = st.session_state.params
+                            d_file = "distancias.csv" 
+                            
+                            result_dict = opt.generate_allocation(t_file, s_file, d_file, params)
+                            
+                            df_alocacao = result_dict["dataframe"]
+                            raw_data = result_dict["raw_data"]
+                            metricas = met.get_summary_metrics(df_alocacao, raw_data)
 
-                                    st.session_state.optimization_result = result_dict
-                                    st.session_state.df_allocation_result = df_alocacao
-                                    st.session_state.df_unallocated = metricas["unallocated"]
-                                    st.session_state.df_unfilled = metricas["unfilled_vacancies"]
-                                    
-                                    st.session_state.optimization_done = True
-                                    st.success("Otimização concluída!", icon="✅")
+                            st.session_state.optimization_result = result_dict
+                            st.session_state.df_allocation_result = df_alocacao
+                            st.session_state.df_unallocated = metricas["unallocated"]
+                            st.session_state.df_unfilled = metricas["unfilled_vacancies"]
+                            
+                            st.session_state.optimization_done = True
+                            
+                        # O success precisa ficar fora do bloco 'with st.spinner' 
+                        # para aparecer no lugar exato do spinner quando ele sumir.
+                        st.success("Otimização concluída!", icon="✅")
 
-                            except Exception as e:
-                                st.error(f"Erro durante a otimização: {e}")
+                    except Exception as e:
+                        st.error(f"Erro durante a otimização: {e}")
 
         # --- EXIBIÇÃO DOS RESULTADOS ---
         if st.session_state.get("optimization_done", False):
@@ -142,6 +141,17 @@ if st.session_state.current_page == "home":
 
             st.markdown("---")
             st.subheader("📊 Estatísticas da Alocação")
+
+            st.markdown(
+                """
+                <style>
+                [data-testid="stMetricDelta"] svg {
+                    display: none;
+                }
+                </style>
+                """,
+                unsafe_allow_html=True,
+            )
             
             m1, m2, m3, m4 = st.columns(4)
             
@@ -170,7 +180,7 @@ if st.session_state.current_page == "home":
                 if allocation.empty:
                     st.info("Nenhuma alocação foi possível com os dados e restrições fornecidos.")
                 else:
-                    st.dataframe(allocation, use_container_width=True, hide_index=True)
+                    st.dataframe(allocation, width="stretch", hide_index=True)
                     
                     csv_data = allocation.to_csv(index=False).encode('utf-8')
                     st.download_button(
@@ -185,14 +195,14 @@ if st.session_state.current_page == "home":
                 if df_nao_alocados.empty:
                     st.success("Excelente! Todos os tutores foram alocados em alguma vaga.")
                 else:
-                    st.dataframe(df_nao_alocados, use_container_width=True, hide_index=True)
+                    st.dataframe(df_nao_alocados, width="stretch", hide_index=True)
                     
             with aba3:
                 df_vagas = st.session_state.df_unfilled
                 if df_vagas.empty:
                     st.success("Perfeito! Todas as vagas ofertadas pelas escolas foram preenchidas.")
                 else:
-                    st.dataframe(df_vagas, use_container_width=True, hide_index=True)
+                    st.dataframe(df_vagas, width="stretch", hide_index=True)
 
 # ------------------ CONFIGURAÇÕES ------------------
 if st.session_state.current_page == "config":
@@ -288,7 +298,7 @@ if st.session_state.current_page == "config":
 
     btn_c1, btn_c2, btn_c3 = st.columns([2, 1, 2])
     with btn_c2:
-        if st.button("Salvar Configurações", type="primary", use_container_width=False):
+        if st.button("Salvar Configurações", type="primary", width="content"):
                 # Verificar se os arquivos foram enviados
                 if tutors_file is None or schools_file is None:
                     st.error("Por favor, faça o upload dos arquivos de Tutores e Escolas.")
@@ -317,26 +327,40 @@ if st.session_state.current_page == "config":
 
 # ------------------ INFORMAÇÕES ------------------
 if st.session_state.current_page == "info":
-    st.markdown("<h1 style='text-align: center; color: #eb8334;'>Informações</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #eb8334;'>Informações do Sistema</h1>", unsafe_allow_html=True)
+    st.write("")
 
     col1, col2, col3 = st.columns([1, 10, 1])
 
     with col2:
-        st.markdown("### Sobre o Projeto")
-        st.markdown("""
-        Este projeto visa otimizar a alocação de tutores às escolas do projeto CODE, utilizando um algoritmo que considera as preferências dos tutores, suas classificações e a distância até as escolas.
+        st.info("""
+        **🎓 Sobre o Projeto**: Esta ferramenta é fruto do **Trabalho de Conclusão de Curso (TCC)** em **Engenharia de Computação** pela **Universidade Federal da Paraíba (UFPB)**. 
+        O objetivo é resolver o complexo problema de alocação de tutores do projeto CODE através de técnicas de Pesquisa Operacional (Programação Inteira Mista).
         """)
 
-        st.markdown("### Parâmetros do Algoritmo")
+        st.markdown("### ⚙️ Como o Algoritmo Funciona?")
         st.markdown("""
-        - **Preferências dos Tutores:** Cada tutor pode indicar suas preferências por até três escolas. A pontuação atribuída a cada preferência pode ser configurada na página de Configurações.
-        - **Distância até as Escolas:** A distância entre a localização do tutor e a escola influencia a pontuação. A pontuação base e o tipo de decaimento (sigmoide ou linear) podem ser ajustados.
-        - **Classificação dos Tutores:** A classificação dos tutores no sistema CODE também afeta a pontuação. Uma pontuação base para o ranking pode ser definida.
+        O sistema não faz escolhas aleatórias. Ele busca a **melhor distribuição global** possível cruzando os dados e resolvendo um problema matemático de maximização, respeitando regras estritas:
+        * **Restrições Rígidas:** Um tutor não pode ser alocado em turnos nos quais não tem disponibilidade; e uma escola não pode receber mais tutores do que o seu limite de vagas ofertadas.
+        * **Função Objetivo:** O motor avalia milhares de combinações para gerar a maior "pontuação" total. Essa pontuação é calculada individualmente para cada possível par (Tutor ↔ Escola) com base nos pesos definidos.
         """)
 
-        st.markdown("### Como Utilizar")
+        st.markdown("### 🎛️ Entendendo os Parâmetros")
+        
+        with st.expander("Clique para ver os detalhes dos parâmetros configuráveis", expanded=True):
+            st.markdown("""
+            - 🥇🥈🥉 **Preferências (1ª, 2ª e 3ª Opção):** Tutores alocados em suas escolas preferidas geram as maiores pontuações. Você pode definir o 'peso' de cada uma dessas escolhas.
+            - 🏆 **Ranking:** O multiplicador do ranking garante justiça ao processo. Tutores com melhor classificação no processo seletivo recebem uma prioridade matemática na disputa por vagas concorridas.
+            - 🗺️ **Distância e Decaimento:** Caso o tutor não consiga vaga em suas preferências diretas, o sistema tenta alocá-lo em uma escola próxima à sua 1ª opção. O modelo calcula a matriz de distâncias geográficas e reduz a pontuação quanto mais longe for a escola (utilizando um decaimento **Linear** ou **Sigmoide**).
+            """)
+
+        st.markdown("### 📊 Interpretando os Resultados")
         st.markdown("""
-        1. Navegue até a página de Configurações para enviar os arquivos CSV dos tutores e das escolas, e ajustar os parâmetros do algoritmo.
-        2. Retorne à página inicial e clique no botão 'Otimizar' para executar o algoritmo de alocação.
-        3. Após a conclusão, os resultados da otimização serão exibidos em uma tabela.
+        Após rodar a otimização na aba **Início**, o sistema gera um painel de diagnóstico completo dividido em três visões:
+        1. **✅ Alocações:** A lista oficial final de quem foi alocado, para qual escola e em qual turno.
+        2. **❌ Não Alocados:** Uma auditoria detalhada listando os tutores que ficaram de fora e o motivo matemático exato (ex: *Competição por Ranking* ou *Conflito de Disponibilidade*).
+        3. **⚠️ Vagas Remanescentes:** Um alerta para a coordenação mostrando quais escolas ainda têm vagas ociosas para futuras chamadas.
         """)
+        
+        st.markdown("---")
+        st.markdown("<p style='text-align: center; color: gray;'>Desenvolvido por Ezequiel Teotônio Jó.</p>", unsafe_allow_html=True)
