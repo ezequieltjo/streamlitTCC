@@ -13,9 +13,7 @@ def analyze_unallocated_tutors(df_allocation, raw_data):
     Analisa os tutores que não foram alocados, determinando o motivo e 
     extraindo suas preferências, polos e disponibilidades.
     Retorna um DataFrame estruturado para exibição direta no Streamlit.
-    """
-    
-    # --- 1. Extração dos Dados Brutos da Memória ---
+    """ 
     all_tutors = raw_data.get('tutors', [])
     time_slots = raw_data.get('time_slots', [])
     vacancies_dict = raw_data.get('vacancies', {})
@@ -24,12 +22,12 @@ def analyze_unallocated_tutors(df_allocation, raw_data):
     availability = raw_data.get('availability', {})
     tutor_districts = raw_data.get('tutor_districts', {})
     
-    # --- 2. Identificação de quem ficou de fora ---
+    # --- Identificação de quem ficou de fora ---
     if df_allocation.empty:
         allocated_tutors = set()
     else:
         allocated_tutors = set(df_allocation['Tutor Alocado'].dropna())
-        
+    
     unallocated_tutors = set(all_tutors) - allocated_tutors
     
     if not unallocated_tutors:
@@ -39,8 +37,7 @@ def analyze_unallocated_tutors(df_allocation, raw_data):
             'Polos Preferenciais', 'Turnos Disponíveis'
         ])
         
-    # --- 3. Mapeando Vencedores ---
-    
+    # --- Mapeando Vencedores ---
     # Identifica todas as vagas ofertadas originalmente
     available_vacancies = set()
     for (time_slot, school), count in vacancies_dict.items():
@@ -63,13 +60,13 @@ def analyze_unallocated_tutors(df_allocation, raw_data):
             # Conta quantas pessoas foram alocadas nesta vaga específica
             allocated_counts[v_key] = allocated_counts.get(v_key, 0) + 1
             
-            # Se a vaga já tem alguém, guardamos o maior número de ranking (o pior concorrente)
+            # Se a vaga já tem alguém, guarda o maior número de ranking (o pior concorrente)
             if v_key in winners_by_vacancy:
                 winners_by_vacancy[v_key] = max(winners_by_vacancy[v_key], tutor_rank)
             else:
                 winners_by_vacancy[v_key] = tutor_rank
                 
-    # --- 4. Análise Individual dos Não Alocados ---
+    # --- Análise Individual dos Não Alocados ---
     results = []
     
     # Ordena para o relatório seguir a ordem dos melhores rankings primeiro
@@ -130,11 +127,9 @@ def analyze_unfilled_vacancies(df_allocation, raw_data):
     pelo modelo para identificar exatamente onde sobraram vagas.
     Retorna um DataFrame estruturado para exibição direta no Streamlit.
     """
-    
-    # --- 1. Extração dos Dados Brutos da Memória ---
     vacancies_dict = raw_data.get('vacancies', {})
     
-    # --- 2. Contagem das Alocações Realizadas ---
+    # --- Contagem das Alocações Realizadas ---
     if df_allocation.empty:
         allocated_counts = {}
     else:
@@ -142,7 +137,7 @@ def analyze_unfilled_vacancies(df_allocation, raw_data):
         # to_dict() cria algo como: {('Manha', 'Escola A'): 2, ('Tarde', 'Escola B'): 1}
         allocated_counts = df_allocation.groupby(['Turno da Vaga', 'Escola']).size().to_dict()
         
-    # --- 3. Verificação de Vagas Sobrando ---
+    # --- Verificação de Vagas Sobrando ---
     unfilled_results = []
     
     for (time_slot, school), total_offered in vacancies_dict.items():
@@ -151,7 +146,7 @@ def analyze_unfilled_vacancies(df_allocation, raw_data):
             filled = allocated_counts.get((time_slot, school), 0)
             remaining = total_offered - filled
             
-            # Se a quantidade ofertada for maior que a preenchida, sobrou vaga!
+            # Se a quantidade ofertada for maior que a preenchida, sobrou vaga
             if remaining > 0:
                 unfilled_results.append({
                     'Escola': school,
@@ -161,15 +156,14 @@ def analyze_unfilled_vacancies(df_allocation, raw_data):
                     'Vagas Sobrando': remaining
                 })
                 
-    # --- 4. Construção e Formatação do DataFrame ---
+    # --- Construção e Formatação do DataFrame ---
     if not unfilled_results:
-        # Se não sobrou NENHUMA vaga, devolve um DataFrame vazio com os cabeçalhos corretos
+        # Se não sobrou nenhuma vaga, devolve um DataFrame vazio
         df_unfilled = pd.DataFrame(columns=[
             'Escola', 'Turno da Vaga', 'Vagas Ofertadas', 'Vagas Preenchidas', 'Vagas Sobrando'
         ])
     else:
         df_unfilled = pd.DataFrame(unfilled_results)
-        # Ordena alfabeticamente pela Escola e Turno para a tabela ficar bonita no site
         df_unfilled = df_unfilled.sort_values(by=['Escola', 'Turno da Vaga']).reset_index(drop=True)
         
     return df_unfilled
@@ -180,8 +174,6 @@ def analyze_polo_matches(df_allocation, raw_data):
     em escolas pertencentes a um de seus polos de preferência.
     Retorna um dicionário com os KPIs para exibição no Streamlit.
     """
-    
-    # --- 1. Extração dos Dados Limpos da Memória ---
     tutor_districts = raw_data.get('tutor_districts', {})
     school_districts = raw_data.get('school_districts', {})
     
@@ -195,7 +187,7 @@ def analyze_polo_matches(df_allocation, raw_data):
             'Percentual_Polo_Preferido': 0.0
         }
         
-    # --- 2. Lógica de Match Direto (O(1) lookup) ---
+    # --- Lógica de Match Direto ---
     for _, row in df_allocation.iterrows():
         tutor = row['Tutor Alocado']
         school = row['Escola']
@@ -208,7 +200,7 @@ def analyze_polo_matches(df_allocation, raw_data):
         if school_polo and school_polo in tutor_preferred_polos:
             polo_matches += 1
             
-    # --- 3. Cálculo e Retorno ---
+    # --- Cálculo e Retorno ---
     match_percentage = (polo_matches / total_allocated) * 100 if total_allocated > 0 else 0.0
     
     return {
@@ -223,12 +215,9 @@ def analyze_preferences_matches(df_allocation, raw_data):
     foi colocado na sua 1ª, 2ª, 3ª opção ou fora das suas preferências diretas.
     Retorna um DataFrame com a contagem e percentual (ideal para gráficos no Streamlit).
     """
-    
-    # --- 1. Extração dos Dados da Memória ---
     preferences = raw_data.get('preferences', {})
     total_allocated = len(df_allocation)
-    
-    # --- 2. Inicialização dos Contadores ---
+
     counts = {
         '1ª Opção': 0,
         '2ª Opção': 0,
@@ -243,12 +232,12 @@ def analyze_preferences_matches(df_allocation, raw_data):
             for k in counts.keys()
         ])
         
-    # --- 3. Verificação do Match ---
+    # --- Verificação do Match ---
     for _, row in df_allocation.iterrows():
         tutor = row['Tutor Alocado']
         school = row['Escola']
         
-        # Pega a lista de escolas preferenciais do tutor (geralmente 3)
+        # Pega a lista de escolas preferenciais do tutor
         tutor_prefs = preferences.get(tutor, [])
         
         # Verifica em qual posição a escola alocada está na lista
@@ -261,12 +250,12 @@ def analyze_preferences_matches(df_allocation, raw_data):
             elif position == 2:
                 counts['3ª Opção'] += 1
             else:
-                counts['Fora das Preferências'] += 1  # Prevenção estrutural
+                counts['Fora das Preferências'] += 1
         else:
             # Caiu numa escola que não estava na lista (venceu por distância/polo)
             counts['Fora das Preferências'] += 1
             
-    # --- 4. Construção do DataFrame de Resumo ---
+    # --- Construção do DataFrame de Resumo ---
     results = []
     for category, count in counts.items():
         percentage = (count / total_allocated) * 100
@@ -329,7 +318,11 @@ def _generate_detailed_report(df_allocation, raw_data, params):
 
     # Identifica as escolas ativas nesta instância específica
     schools_file = params.get('arq_escolas')
-    df_instance_schools = pd.read_csv(schools_file)
+    if isinstance(schools_file, str):
+        df_instance_schools = pd.read_csv(schools_file)
+    else:
+        schools_file.seek(0)
+        df_instance_schools = pd.read_csv(schools_file)
     school_col = 'Escola' if 'Escola' in df_instance_schools.columns else df_instance_schools.columns[0]
     active_schools = set(df_instance_schools[school_col].unique())
 
@@ -367,7 +360,7 @@ def _generate_detailed_report(df_allocation, raw_data, params):
                 if decay_type == 'linear':
                     base_pref = params.get('baseDistance', 5000)
                     base_score = max(0, base_pref * (1 - (calculated_dist / max_distance)))
-                else: # sigmoid_decay
+                else: # Decaimento Sigmoidal
                     scale = params.get('sigmoidCurve', 2000)
                     base_pref = params.get('baseDistance', 5000)
                     base_score = base_pref / (1 + np.exp((calculated_dist - distance_mean) / scale))
@@ -387,12 +380,12 @@ def _generate_detailed_report(df_allocation, raw_data, params):
     return pd.DataFrame(rows).sort_values(['Ranking', 'Final'])
 
 def _save_visual_charts(df_detailed, path):
-    """Gera os gráficos com tipagem rígida para o Matplotlib funcionar corretamente."""
+    """Gera os gráficos das métricas."""
     plt.figure(figsize=(15, 4))
 
     total_allocated = len(df_detailed)
 
-    # 1. Gráfico de Preferências Atendidas
+    # --- Gráfico de Preferências Atendidas ---
     plt.subplot(1, 3, 1)
     count_pref1 = len(df_detailed[df_detailed['PrefPos'] == 1])
     count_pref2 = len(df_detailed[df_detailed['PrefPos'] == 2])
@@ -412,7 +405,7 @@ def _save_visual_charts(df_detailed, path):
         yval = barra.get_height()
         plt.text(barra.get_x() + barra.get_width()/2, yval + 1, f'{yval:.1f}%', ha='center', va='bottom')
 
-    # 2. Histograma de Distâncias (Apenas não-preferências válidas)
+    # --- Histograma de Distâncias (Apenas não-preferências válidas) ---
     plt.subplot(1, 3, 2)
     dist_non_pref = df_detailed[df_detailed['PrefPos'].isna()]['Distância']
     dist_numeric = pd.to_numeric(dist_non_pref, errors='coerce')
@@ -423,7 +416,7 @@ def _save_visual_charts(df_detailed, path):
     plt.title('Distribuição de Distâncias (Não-Preferências)')
     plt.xlabel('Metros')
 
-    # 3. Dispersão Ranking vs Benefício
+    # --- Dispersão Ranking vs Benefício ---
     plt.subplot(1, 3, 3)
     rankings_numeric = pd.to_numeric(df_detailed['Ranking'], errors='coerce')
     benefits_numeric = pd.to_numeric(df_detailed['Final'], errors='coerce')
@@ -517,7 +510,6 @@ def get_summary_metrics(df_allocation, raw_data):
 
 def export_local_reports(allocation_result, params, base_path='alocacoes/'):
     """
-    Porta de Entrada do NOTEBOOK / LOCAL.
     Gera exatamente os 6 arquivos e o histórico.
     """
     df_allocation = allocation_result['dataframe']
@@ -526,14 +518,17 @@ def export_local_reports(allocation_result, params, base_path='alocacoes/'):
 
     # Lê o arquivo de escolas desta instância específica para isolar as escolas ativas
     schools_file = params.get('arq_escolas')
-    df_instance_schools = pd.read_csv(schools_file)
+    if isinstance(schools_file, str):
+        df_instance_schools = pd.read_csv(schools_file)
+    else:
+        schools_file.seek(0)
+        df_instance_schools = pd.read_csv(schools_file)
     school_col = 'Escola' if 'Escola' in df_instance_schools.columns else df_instance_schools.columns[0]
     active_schools = set(df_instance_schools[school_col].unique())
 
-    # Calcula a Distância Média da Instância
+    # Calcula a Distância Média da Instância (apenas entre escolas ativas nessa instância e com distâncias válidas)
     distances = raw_data.get('distances', {})
-    
-    # Filtra ignorando infinitos, zeros (mesma escola) e escolas de fora da instância
+
     dist_values = [
         dist for (school_A, school_B), dist in distances.items() 
         if school_A in active_schools and school_B in active_schools and dist != float('inf') and dist > 0
@@ -571,7 +566,7 @@ def export_local_reports(allocation_result, params, base_path='alocacoes/'):
     return output_path
 
 def _update_general_history(base_path, params, stats, df_detailed, df_unallocated, polo_kpis, cross_analysis):
-    """Gera o arquivo mestre historico_alocacoes.csv com colunas acadêmicas completas em Inglês."""
+    """Gera o arquivo historico_alocacoes.csv."""
     history_file = os.path.join(base_path, 'historico_alocacoes.csv')
     
     total_allocated = len(df_detailed)
@@ -600,7 +595,7 @@ def _update_general_history(base_path, params, stats, df_detailed, df_unallocate
         'Timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         'Instance_ID': params.get('Instancia_ID', 'N/A'),
         
-        # Hiperparâmetros
+        # Parâmetros
         'Shift_Mode': params.get('shift_mode', ''),
         'Decay_Type': params.get('decayType', ''),
         'Score_Pref1': params.get('pref1', 0),
@@ -615,7 +610,7 @@ def _update_general_history(base_path, params, stats, df_detailed, df_unallocate
         'Allocated_Tutors': stats.get('filled_vacancies', 0),
         'Fill_Rate_Pct': (stats.get('filled_vacancies', 0) / stats.get('total_vacancies', 1)) * 100 if stats.get('total_vacancies', 0) else 0,
         
-        # Qualidade da Alocação (COM BASELINES)
+        # Qualidade da Alocação
         'Total_Benefit': total_benefit,
         'Avg_Ranking': avg_ranking,
         'Ideal_Ranking': ideal_ranking,
