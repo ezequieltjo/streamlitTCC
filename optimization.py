@@ -78,9 +78,11 @@ def read_tutors(file_input, shift_mode):
             
             # Usa .get() para evitar erros caso as colunas de preferência não existam
             preferences[tutor] = [
-                row.get('Preferencia1'),
-                row.get('Preferencia2'),
-                row.get('Preferencia3')
+                p for p in [
+                    row.get('Preferencia1'),
+                    row.get('Preferencia2'),
+                    row.get('Preferencia3')
+                ] if p and str(p).strip()
             ]
 
             district_str = row.get('Polos', '').strip()
@@ -362,7 +364,8 @@ def calculate_benefits(tutors, schools, preferences, distances, rankings,
         # Usa o parâmetro 'baseRanking'
         multiplier = max(baseRanking - (ranking_position - 1) * decrement, 1)
         
-        reference_school = prefs[0] if prefs else None
+        valid_prefs = [p for p in prefs if p and str(p).strip()]
+        reference_school = valid_prefs[0] if valid_prefs else None
         
         for school in schools:
             if school in prefs:

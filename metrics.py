@@ -438,42 +438,38 @@ def _save_visual_charts(df_detailed, path):
     plt.close()
 
 def _save_text_report(path, params, stats, df_detailed, df_unallocated, df_unfilled, polo_kpis, pref_summary, cross_analysis):
-    """Gera um relatorio_metricas.txt limpo, escaneável e direto ao ponto."""
+    """Gera um relatorio_metricas.txt."""
     total_allocated = len(df_detailed)
     
-    # Cálculos de qualidade da alocação
     total_benefit = df_detailed['Final'].sum() if total_allocated > 0 else 0
     avg_ranking = df_detailed['Ranking'].mean() if total_allocated > 0 else 0
     ideal_ranking = (1 + total_allocated) / 2 if total_allocated > 0 else 0
     equity_std_dev = df_detailed['Final'].std() if total_allocated > 1 else 0
     
-    # Isola as distâncias de quem caiu fora das preferências (limpando infinitos/nulos)
-    dist_non_pref = df_detailed[df_detailed['PrefPos'].isnull()]['Distância']
-    dist_non_pref = dist_non_pref.replace([np.inf, -np.inf], np.nan).dropna()
+    dist_non_pref = df_detailed[df_detailed['PrefPos'].isnull()]['Distância'].replace([np.inf, -np.inf], np.nan).dropna()
     avg_dist_non_pref = dist_non_pref.mean() if not dist_non_pref.empty else 0
+    avg_scenario_dist = stats.get('avg_scenario_distance', 0)
 
-    # Diagnóstico dos tutores não alocados
     total_unallocated = len(df_unallocated)
     best_unallocated_rank = df_unallocated['Ranking'].min() if total_unallocated > 0 and 'Ranking' in df_unallocated else 'N/A'
     
-    # Contagem dos motivos de não alocação
     unallocated_reasons = df_unallocated['Motivo'].value_counts() if total_unallocated > 0 else {}
     rank_competition = unallocated_reasons.get('COMPETIÇÃO POR RANKING', 0)
     time_conflict = unallocated_reasons.get('CONFLITO DE DISPONIBILIDADE', 0)
     mixed_optimization = unallocated_reasons.get('INDETERMINADO / MISTO', 0)
 
-    # Formata o dicionário de preferências para facilitar o print
     pref_dict = {row['Categoria']: (row['Quantidade'], row['Percentual']) for _, row in pref_summary.iterrows()}
 
-    # --- ESCRITA DO ARQUIVO LIMPO ---
+    decay_type = params.get('decayType', 'sigmoid')
+    decay_str = f"{decay_type} (Escala: {params.get('sigmoidCurve', 'N/A')})" if decay_type == 'sigmoid' else decay_type
+
     with open(os.path.join(path, 'relatorio_metricas.txt'), 'w', encoding='utf-8') as f:
         f.write("RELATÓRIO DE OTIMIZAÇÃO DE ALOCAÇÃO\n")
         f.write(f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
         f.write("-" * 50 + "\n\n")
         
         f.write("[ CONFIGURAÇÕES DA SIMULAÇÃO ]\n")
-        f.write(f"Arquivos  : Tutores ({params.get('arq_tutores', 'N/A')}) | Escolas ({params.get('arq_escolas', 'N/A')})\n")
-        f.write(f"Motor     : Turnos ({params.get('shift_mode', 'dias_turnos')}) | Decaimento ({params.get('decayType', 'sigmoid')})\n")
+        f.write(f"Motor     : Turnos ({params.get('shift_mode', 'N/A')}) | Decaimento ({decay_str})\n")
         f.write(f"Pesos     : 1ª Opção ({params.get('pref1', 0)}) | 2ª Opção ({params.get('pref2', 0)}) | 3ª Opção ({params.get('pref3', 0)})\n\n")
         
         f.write("[ RESULTADOS GERAIS ]\n")
@@ -485,9 +481,9 @@ def _save_text_report(path, params, stats, df_detailed, df_unallocated, df_unfil
         
         f.write(f"[ QUALIDADE DA ALOCAÇÃO (Base: {total_allocated} alocados) ]\n")
         f.write(f"Benefício Total    : {total_benefit:,.2f}\n")
-        f.write(f"Ranking Médio      : {avg_ranking:.1f} (Ideal: {ideal_ranking:.1f})\n")
+        f.write(f"Ranking Médio      : {avg_ranking:.1f} (Cenário Ideal: {ideal_ranking:.1f})\n")
         f.write(f"Desvio Padrão      : {equity_std_dev:,.2f}\n")
-        f.write(f"Distância Média    : {avg_dist_non_pref:.2f} m (Para alocados fora das preferências)\n\n")
+        f.write(f"Distância Média    : {avg_dist_non_pref:.2f} m (Cenário Base: {avg_scenario_dist:.2f} m)\n\n")
         
         f.write("[ ATENDIMENTO DE PREFERÊNCIAS (ESCOLAS) ]\n")
         f.write(f"1ª Opção           : {pref_dict.get('1ª Opção', (0,0))[0]:>3} ({pref_dict.get('1ª Opção', (0,0))[1]:>5.1f}%)\n")
@@ -675,70 +671,3 @@ def _update_general_history(base_path, params, stats, df_detailed, df_unallocate
         df_hist = df_new
         
     df_hist.to_csv(history_file, index=False)
-
-def _save_text_report(path, params, stats, df_detailed, df_unallocated, df_unfilled, polo_kpis, pref_summary, cross_analysis):
-    """Gera um relatorio_metricas.txt limpo, com baselines e parâmetros completos."""
-    total_allocated = len(df_detailed)
-    
-    total_benefit = df_detailed['Final'].sum() if total_allocated > 0 else 0
-    avg_ranking = df_detailed['Ranking'].mean() if total_allocated > 0 else 0
-    ideal_ranking = (1 + total_allocated) / 2 if total_allocated > 0 else 0
-    equity_std_dev = df_detailed['Final'].std() if total_allocated > 1 else 0
-    
-    dist_non_pref = df_detailed[df_detailed['PrefPos'].isnull()]['Distância'].replace([np.inf, -np.inf], np.nan).dropna()
-    avg_dist_non_pref = dist_non_pref.mean() if not dist_non_pref.empty else 0
-    avg_scenario_dist = stats.get('avg_scenario_distance', 0)
-
-    total_unallocated = len(df_unallocated)
-    best_unallocated_rank = df_unallocated['Ranking'].min() if total_unallocated > 0 and 'Ranking' in df_unallocated else 'N/A'
-    
-    unallocated_reasons = df_unallocated['Motivo'].value_counts() if total_unallocated > 0 else {}
-    rank_competition = unallocated_reasons.get('COMPETIÇÃO POR RANKING', 0)
-    time_conflict = unallocated_reasons.get('CONFLITO DE DISPONIBILIDADE', 0)
-    mixed_optimization = unallocated_reasons.get('INDETERMINADO / MISTO', 0)
-
-    pref_dict = {row['Categoria']: (row['Quantidade'], row['Percentual']) for _, row in pref_summary.iterrows()}
-
-    decay_type = params.get('decayType', 'sigmoid')
-    decay_str = f"{decay_type} (Escala: {params.get('sigmoidCurve', 'N/A')})" if decay_type == 'sigmoid' else decay_type
-
-    with open(os.path.join(path, 'relatorio_metricas.txt'), 'w', encoding='utf-8') as f:
-        f.write("RELATÓRIO DE OTIMIZAÇÃO DE ALOCAÇÃO\n")
-        f.write(f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
-        f.write("-" * 50 + "\n\n")
-        
-        f.write("[ CONFIGURAÇÕES DA SIMULAÇÃO ]\n")
-        f.write(f"Motor     : Turnos ({params.get('shift_mode', 'N/A')}) | Decaimento ({decay_str})\n")
-        f.write(f"Pesos     : 1ª Opção ({params.get('pref1', 0)}) | 2ª Opção ({params.get('pref2', 0)}) | 3ª Opção ({params.get('pref3', 0)})\n\n")
-        
-        f.write("[ RESULTADOS GERAIS ]\n")
-        f.write(f"Vagas Ofertadas    : {stats.get('total_vacancies', 0)}\n")
-        f.write(f"Vagas Preenchidas  : {stats.get('filled_vacancies', 0)}\n")
-        if not df_unfilled.empty:
-            f.write(f"Vagas Ociosas      : {df_unfilled['Vagas Sobrando'].sum()} (Verificar CSV de vagas não preenchidas)\n")
-        f.write(f"Tutores De Fora    : {total_unallocated}\n\n")
-        
-        f.write(f"[ QUALIDADE DA ALOCAÇÃO (Base: {total_allocated} alocados) ]\n")
-        f.write(f"Benefício Total    : {total_benefit:,.2f}\n")
-        f.write(f"Ranking Médio      : {avg_ranking:.1f} (Cenário Ideal: {ideal_ranking:.1f})\n")
-        f.write(f"Desvio Padrão      : {equity_std_dev:,.2f}\n")
-        f.write(f"Distância Média    : {avg_dist_non_pref:.2f} m (Cenário Base: {avg_scenario_dist:.2f} m)\n\n")
-        
-        f.write("[ ATENDIMENTO DE PREFERÊNCIAS (ESCOLAS) ]\n")
-        f.write(f"1ª Opção           : {pref_dict.get('1ª Opção', (0,0))[0]:>3} ({pref_dict.get('1ª Opção', (0,0))[1]:>5.1f}%)\n")
-        f.write(f"2ª Opção           : {pref_dict.get('2ª Opção', (0,0))[0]:>3} ({pref_dict.get('2ª Opção', (0,0))[1]:>5.1f}%)\n")
-        f.write(f"3ª Opção           : {pref_dict.get('3ª Opção', (0,0))[0]:>3} ({pref_dict.get('3ª Opção', (0,0))[1]:>5.1f}%)\n")
-        f.write(f"Fora das Opções    : {pref_dict.get('Fora das Preferências', (0,0))[0]:>3} ({pref_dict.get('Fora das Preferências', (0,0))[1]:>5.1f}%)\n\n")
-
-        f.write("[ ATENDIMENTO DE POLOS E ANÁLISE CRUZADA ]\n")
-        f.write(f"Sucesso de Polo    : {polo_kpis.get('Percentual_Polo_Preferido', 0):.1f}% ({polo_kpis.get('Tutores_Polo_Preferido', 0)} tutores)\n")
-        f.write(f"Match Escola       : {(cross_analysis.get('ESCOLA_PREFERIDA', 0)/total_allocated)*100 if total_allocated else 0:.1f}%\n")
-        f.write(f"Match Só Polo      : {(cross_analysis.get('POLO_PREFERIDO_APENAS', 0)/total_allocated)*100 if total_allocated else 0:.1f}%\n")
-        f.write(f"Sem Match Nenhum   : {(cross_analysis.get('SEM_PREFERENCIA_ATENDIDA', 0)/total_allocated)*100 if total_allocated else 0:.1f}%\n\n")
-
-        if total_unallocated > 0:
-            f.write(f"[ DIAGNÓSTICO DOS {total_unallocated} NÃO ALOCADOS ]\n")
-            f.write(f"Melhor Ranking de Fora      : {best_unallocated_rank}\n")
-            f.write(f"Competição por Ranking      : {rank_competition} ({(rank_competition/total_unallocated)*100:.1f}%)\n")
-            f.write(f"Conflito de Disponibilidade : {time_conflict} ({(time_conflict/total_unallocated)*100:.1f}%)\n")
-            f.write(f"Otimização Global (Misto)   : {mixed_optimization} ({(mixed_optimization/total_unallocated)*100:.1f}%)\n")
