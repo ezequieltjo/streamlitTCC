@@ -2,7 +2,7 @@ import csv
 import io
 import math
 import pandas as pd
-from mip import Model, xsum, MAXIMIZE, BINARY, CBC
+from mip import Model, xsum, MAXIMIZE, BINARY, CBC, OptimizationStatus
 
 distance_matrix = 'distancias.csv'
 
@@ -491,7 +491,7 @@ def generate_allocation(tutors_file, schools_file, distances_file, params_dict):
         model = Model(sense=MAXIMIZE, solver_name=CBC)
         model.verbose = 0 # Silencia os logs do solver no console
 
-        # --- GARANTIA DE REPRODUTIBILIDADE ---
+        # --- Configuração para Reprodutibilidade ---
         model.threads = 1  # Força o uso de apenas 1 núcleo do processador
         model.seed = 37    # Fixa a semente matemática para os desempates e heurísticas
 
@@ -500,7 +500,6 @@ def generate_allocation(tutors_file, schools_file, distances_file, params_dict):
         for t in tutors:
             for time_slot in time_slots:
                 for s in schools:
-                    # OTIMIZAÇÃO DE VELOCIDADE E MEMÓRIA:
                     # Só cria a variável de decisão se o tutor tem disponibilidade E a escola tem vaga.
                     if availability.get((t, time_slot), 0) > 0 and vacancies.get((time_slot, s), 0) > 0:
                         X[(t, time_slot, s)] = model.add_var(var_type=BINARY)
@@ -531,10 +530,26 @@ def generate_allocation(tutors_file, schools_file, distances_file, params_dict):
             for keys, var in X.items()
         )
         
-        # Resolver o modelo
-        model.optimize()
+        # Resolver o modelo e verificar o status da solução
+        status = model.optimize()
 
-        # --- Extrair e Retornar os Resultados ---  
+        if status == OptimizationStatus.INFEASIBLE:
+            raise ValueError(
+                "O modelo não possui solução viável. "
+                "Verifique se há tutores com disponibilidade para as vagas ofertadas."
+            )
+        elif status == OptimizationStatus.NO_SOLUTION_FOUND:
+            raise ValueError(
+                "O solver não conseguiu encontrar uma solução no tempo limite. "
+                "Tente simplificar as restrições ou aumentar o tempo máximo."
+            )
+        elif status not in (OptimizationStatus.OPTIMAL, OptimizationStatus.FEASIBLE):
+            raise ValueError(
+                f"O solver retornou status inesperado: {status}. "
+                "Não foi possível gerar uma alocação confiável."
+            )
+
+        # --- Extrair e Retornar os Resultados ---
         results_list = extract_allocation_results(X)
 
         if not results_list:
