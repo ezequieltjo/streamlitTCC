@@ -44,27 +44,16 @@ def analyze_unallocated_tutors(df_allocation, raw_data):
         if count > 0:
             available_vacancies.add((school, time_slot))
             
-    # Mapeia quem ocupou as vagas e descobre o concorrente de "Pior Ranking" que ganhou a vaga
+    # Conta alocações por vaga e rastreia o pior ranking vencedor por vaga
     allocated_counts = {}
     winners_by_vacancy = {}
-    
+
     if not df_allocation.empty:
-        for _, row in df_allocation.iterrows():
-            school = row['Escola']
-            time_slot = row['Turno da Vaga']
-            tutor = row['Tutor Alocado']
-            tutor_rank = rankings.get(tutor, 999999)
-            
-            v_key = (school, time_slot)
-            
-            # Conta quantas pessoas foram alocadas nesta vaga específica
-            allocated_counts[v_key] = allocated_counts.get(v_key, 0) + 1
-            
-            # Se a vaga já tem alguém, guarda o maior número de ranking (o pior concorrente)
-            if v_key in winners_by_vacancy:
-                winners_by_vacancy[v_key] = max(winners_by_vacancy[v_key], tutor_rank)
-            else:
-                winners_by_vacancy[v_key] = tutor_rank
+        df_alloc_temp = df_allocation.copy()
+        df_alloc_temp['tutor_rank'] = df_alloc_temp['Tutor Alocado'].map(rankings).fillna(999999).astype(int)
+        df_alloc_temp['v_key'] = list(zip(df_alloc_temp['Escola'], df_alloc_temp['Turno da Vaga']))
+        allocated_counts = df_alloc_temp['v_key'].value_counts().to_dict()
+        winners_by_vacancy = df_alloc_temp.groupby('v_key')['tutor_rank'].max().to_dict()
                 
     # --- Análise Individual dos Não Alocados ---
     results = []
@@ -187,18 +176,13 @@ def analyze_polo_matches(df_allocation, raw_data):
             'Percentual_Polo_Preferido': 0.0
         }
         
-    # --- Lógica de Match Direto ---
-    for _, row in df_allocation.iterrows():
-        tutor = row['Tutor Alocado']
-        school = row['Escola']
-        
-        # Pega o polo da escola e a lista de polos do tutor
-        school_polo = school_districts.get(school, '')
-        tutor_preferred_polos = tutor_districts.get(tutor, [])
-        
-        # Match Perfeito: Se a escola tem um polo, e ele está na lista do tutor
-        if school_polo and school_polo in tutor_preferred_polos:
-            polo_matches += 1
+    # Conta matches de polo via vetorização
+    school_polos = df_allocation['Escola'].map(school_districts).fillna('')
+    tutor_polos = df_allocation['Tutor Alocado'].map(tutor_districts)
+    polo_matches = sum(
+        sp and isinstance(tp, list) and sp in tp
+        for sp, tp in zip(school_polos, tutor_polos)
+    )
             
     # --- Cálculo e Retorno ---
     match_percentage = (polo_matches / total_allocated) * 100 if total_allocated > 0 else 0.0
@@ -232,28 +216,23 @@ def analyze_preferences_matches(df_allocation, raw_data):
             for k in counts.keys()
         ])
         
-    # --- Verificação do Match ---
-    for _, row in df_allocation.iterrows():
-        tutor = row['Tutor Alocado']
-        school = row['Escola']
-        
-        # Pega a lista de escolas preferenciais do tutor
-        tutor_prefs = preferences.get(tutor, [])
-        
-        # Verifica em qual posição a escola alocada está na lista
-        if school in tutor_prefs:
-            position = tutor_prefs.index(school)
-            if position == 0:
-                counts['1ª Opção'] += 1
-            elif position == 1:
-                counts['2ª Opção'] += 1
-            elif position == 2:
-                counts['3ª Opção'] += 1
-            else:
-                counts['Fora das Preferências'] += 1
-        else:
-            # Caiu numa escola que não estava na lista (venceu por distância/polo)
-            counts['Fora das Preferências'] += 1
+    # Descobre a posição da escola nas preferências do tutor (1, 2, 3) ou 0 se fora
+    prefs_series = df_allocation['Tutor Alocado'].map(preferences)
+
+    def _pref_position(prefs, school):
+        if isinstance(prefs, list) and school in prefs:
+            return prefs.index(school) + 1
+        return 0
+
+    positions = pd.Series(
+        [_pref_position(p, s) for p, s in zip(prefs_series, df_allocation['Escola'])],
+        index=df_allocation.index
+    )
+
+    counts['1ª Opção'] = (positions == 1).sum()
+    counts['2ª Opção'] = (positions == 2).sum()
+    counts['3ª Opção'] = (positions == 3).sum()
+    counts['Fora das Preferências'] = (positions == 0).sum()
             
     # --- Construção do DataFrame de Resumo ---
     results = []
@@ -284,20 +263,23 @@ def analyze_cross_preferences(df_allocation, raw_data):
         'SEM_PREFERENCIA_ATENDIDA': 0
     }
     
-    for _, row in df_allocation.iterrows():
-        tutor = row['Tutor Alocado']
-        school = row['Escola']
-        
-        tutor_prefs = preferences.get(tutor, [])
-        tutor_polos = tutor_districts.get(tutor, [])
-        school_polo = school_districts.get(school, '')
-        
-        if school in tutor_prefs:
-            counts['ESCOLA_PREFERIDA'] += 1
-        elif school_polo and school_polo in tutor_polos:
-            counts['POLO_PREFERIDO_APENAS'] += 1
-        else:
-            counts['SEM_PREFERENCIA_ATENDIDA'] += 1
+    # Verifica match de escola, polo ou nenhum via vetorização
+    prefs_series = df_allocation['Tutor Alocado'].map(preferences)
+    tutor_polos_series = df_allocation['Tutor Alocado'].map(tutor_districts)
+    school_polos = df_allocation['Escola'].map(school_districts).fillna('')
+
+    school_match = pd.Series(
+        isinstance(p, list) and s in p
+        for p, s in zip(prefs_series, df_allocation['Escola'])
+    )
+    polo_match = ~school_match & pd.Series(
+        sp and isinstance(tp, list) and sp in tp
+        for sp, tp in zip(school_polos, tutor_polos_series)
+    )
+
+    counts['ESCOLA_PREFERIDA'] = school_match.sum()
+    counts['POLO_PREFERIDO_APENAS'] = polo_match.sum()
+    counts['SEM_PREFERENCIA_ATENDIDA'] = (~school_match & ~polo_match).sum()
             
     return counts
 
@@ -335,11 +317,16 @@ def _generate_detailed_report(df_allocation, raw_data, params):
     distance_mean = sum(dist_values) / len(dist_values) if dist_values else 9000
     max_distance = max(dist_values) if dist_values else 20000
 
-    for _, row in df_allocation.iterrows():
-        tutor = row['Tutor Alocado']
-        school = row['Escola']
-        time_slot = row['Turno da Vaga']
-        
+    # Extrai colunas como arrays para evitar overhead do iterrows
+    alloc_tutors = df_allocation['Tutor Alocado'].values
+    alloc_schools = df_allocation['Escola'].values
+    alloc_slots = df_allocation['Turno da Vaga'].values
+
+    for i in range(len(df_allocation)):
+        tutor = alloc_tutors[i]
+        school = alloc_schools[i]
+        time_slot = alloc_slots[i]
+
         tutor_rank = rankings.get(tutor, total_tutors)
         multiplier = max(base_multiplier - (tutor_rank - 1) * decrement, 1)
         tutor_prefs = preferences.get(tutor, [])
@@ -451,7 +438,8 @@ def _save_text_report(path, params, stats, df_detailed, df_unallocated, df_unfil
     time_conflict = unallocated_reasons.get('CONFLITO DE DISPONIBILIDADE', 0)
     mixed_optimization = unallocated_reasons.get('INDETERMINADO / MISTO', 0)
 
-    pref_dict = {row['Categoria']: (row['Quantidade'], row['Percentual']) for _, row in pref_summary.iterrows()}
+    # Converte DataFrame de preferências em dicionário para lookup rápido
+    pref_dict = dict(zip(pref_summary['Categoria'], zip(pref_summary['Quantidade'], pref_summary['Percentual'])))
 
     decay_type = params.get('decayType', 'sigmoid')
     decay_str = f"{decay_type} (Escala: {params.get('sigmoidCurve', 'N/A')})" if decay_type == 'sigmoid' else decay_type
