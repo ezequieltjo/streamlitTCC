@@ -366,16 +366,20 @@ def calculate_benefits(tutors, schools, preferences, distances, rankings,
         
         valid_prefs = [p for p in prefs if p and str(p).strip()]
         reference_school = valid_prefs[0] if valid_prefs else None
-        
+
+        # Dicionário com a posição de cada preferência
+        pref_positions = {p: i + 1 for i, p in enumerate(prefs) if p and str(p).strip()}
+
         for school in schools:
-            if school in prefs:
-                position = prefs.index(school) + 1
+            position = pref_positions.get(school)
+            if position is not None:
+                # Benefício baseado na posição da preferência (1ª, 2ª ou 3ª)
                 if position == 1:
-                    benefit_score = pref1  # Usa o parâmetro 'pref1'
+                    benefit_score = pref1
                 elif position == 2:
-                    benefit_score = pref2  # Usa o parâmetro 'pref2'
+                    benefit_score = pref2
                 elif position == 3:
-                    benefit_score = pref3  # Usa o parâmetro 'pref3'
+                    benefit_score = pref3
                 else:
                     benefit_score = 0
             else:

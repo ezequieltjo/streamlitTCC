@@ -23,6 +23,7 @@ if 'optimization_result' not in st.session_state:
 if 'saved_config' not in st.session_state:
     st.session_state.saved_config = False
 
+# Evita reprocessamento dos arquivos em cada renderização, se eles não mudarem
 @st.cache_data
 def _get_tutor_count(t_bytes, shift_mode):
     _, _, _, _, _, n_tutors = opt.read_tutors(io.BytesIO(t_bytes), shift_mode)
@@ -233,15 +234,27 @@ if st.session_state.current_page == "config":
             tutors_file = st.session_state.tutors_file
             st.info("Arquivo de Tutores previamente importado (envie um novo para substituir).")
 
-    with col3: 
+    with col3:
         st.markdown("##### Parâmetros do Algoritmo de Otimização")
         st.markdown("Ajuste os parâmetros que influenciam a alocação dos tutores às escolas:")
 
+        # Valores padrão recomendados
+        RECOMMENDED = {
+            "pref1": 8000, "pref2": 7000, "pref3": 6000,
+            "baseDistance": 5000, "baseRanking": 1000000000,
+            "decayType": "sigmoid", "sigmoidCurve": 2000,
+            "shift_mode": "days_shifts"
+        }
+        # Recupera parâmetros salvos ou usa os recomendados
+        saved = st.session_state.get("params", {})
+
         st.markdown("###### Modo de Turnos:")
         shift_mode_options = ['Dias e Turnos (10 colunas)', 'Apenas Turnos (2 colunas)']
+        shift_index = 0 if saved.get("shift_mode", "days_shifts") == "days_shifts" else 1
         selected_shift_mode_label = st.radio(
             "Selecione a quantidade de turnos possíveis:",
             options=shift_mode_options,
+            index=shift_index,
             horizontal=True
         )
 
@@ -253,28 +266,28 @@ if st.session_state.current_page == "config":
 
         st.markdown("###### Pontuação das preferências:")
 
-        pref1 = st.number_input("Pontuação da 1º Preferência de Escola:", min_value=0, value= 8000, icon="🥇")
-        #st.write("Primeira Preferência:", pref1)
+        pref1 = st.number_input("Pontuação da 1º Preferência de Escola:", min_value=0,
+            value=saved.get("pref1", RECOMMENDED["pref1"]), icon="🥇")
+        pref2 = st.number_input("Pontuação da 2º Preferência Escola:", min_value=0,
+            value=saved.get("pref2", RECOMMENDED["pref2"]), icon="🥈")
+        pref3 = st.number_input("Pontuação da 3º Preferência Escola:", min_value=0,
+            value=saved.get("pref3", RECOMMENDED["pref3"]), icon="🥉")
 
-        pref2 = st.number_input("Pontuação da 2º Preferência Escola:", min_value=0, value= 7000, icon="🥈")
-        #st.write("Primeira Preferência:", pref2)
+        baseDistance = st.number_input("Pontuação Base da Preferência por Distâncias:", min_value=0,
+            value=saved.get("baseDistance", RECOMMENDED["baseDistance"]), icon="🗺️")
 
-        pref3 = st.number_input("Pontuação da 3º Preferência Escola:", min_value=0, value= 6000, icon="🥉")
-        #st.write("Primeira Preferência:", pref3)
-
-        baseDistance = st.number_input("Pontuação Base da Preferência por Distâncias:", min_value=0, value= 5000, icon="🗺️")
-
-        baseRanking = st.number_input("Pontuação Base para o Ranking dos Tutores:", min_value=0, value= 1000000000, icon="🏆")
-
-        decayType = 'sigmoid'
+        baseRanking = st.number_input("Pontuação Base para o Ranking dos Tutores:", min_value=0,
+            value=saved.get("baseRanking", RECOMMENDED["baseRanking"]), icon="🏆")
 
         st.markdown("###### Tipo de Decaimento da Pontuação por Distância:")
-        
+
         decayOptions = ['Sigmoide', 'Linear']
+        decay_index = 0 if saved.get("decayType", "sigmoid") == "sigmoid" else 1
         decayType = st.radio(
-            "Escolha o tipo de decaimento:", 
-            options=decayOptions, 
-            horizontal=True, 
+            "Escolha o tipo de decaimento:",
+            options=decayOptions,
+            index=decay_index,
+            horizontal=True,
             label_visibility="collapsed",
             width="stretch"
         )
@@ -284,14 +297,18 @@ if st.session_state.current_page == "config":
         else:
             decayType = 'linear'
 
-        sigmoidCurve = st.number_input("Escala de Inclinação da Curva Sigmoide:", min_value=0, value=2000, icon="📉")
+        sigmoidCurve = st.number_input("Escala de Inclinação da Curva Sigmoide:", min_value=0,
+            value=saved.get("sigmoidCurve", RECOMMENDED["sigmoidCurve"]), icon="📉")
+
+        # Restaura todos os parâmetros para os valores recomendados
+        if st.button("Usar configuração recomendada"):
+            st.session_state.pop("params", None)
+            st.rerun()
 
     if tutors_file or schools_file:
         st.markdown("---")
         st.markdown("##### 🔍 Pré-visualização dos Dados")
         show_file_stats(tutors_file, schools_file, shift_mode)
-
-    #st.write("Configurações: ", pref1, "/", pref2, "/", pref3, "/", baseDistance, "/", baseRanking, "/", decayType, "/", sigmoidCurve)
 
     btn_c1, btn_c2, btn_c3 = st.columns([2, 1, 2])
     with btn_c2:
