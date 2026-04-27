@@ -1,3 +1,4 @@
+import io
 import streamlit as st
 from PIL import Image
 import optimization as opt
@@ -22,32 +23,33 @@ if 'optimization_result' not in st.session_state:
 if 'saved_config' not in st.session_state:
     st.session_state.saved_config = False
 
-def show_file_stats(t_file, s_file, shift_mode_label):
-    """
-    Lê os arquivos carregados para exibir estatísticas rápidas na tela de configuração.
-    """
-    if shift_mode_label == 'Dias e Turnos (10 colunas)':
-        shift_mode = 'days_shifts'
-    else:
-        shift_mode = 'shifts'
-    
-    c1, c2 = st.columns(2)
+@st.cache_data
+def _get_tutor_count(t_bytes, shift_mode):
+    _, _, _, _, _, n_tutors = opt.read_tutors(io.BytesIO(t_bytes), shift_mode)
+    return n_tutors
 
-    if t_file:
-        try:
-            # CORRIGIDO: Agora tem 5 underlines para ignorar os 5 primeiros valores e pegar o 6º (n_tutors)
-            _, _, _, _, _, n_tutors = opt.read_tutors(t_file, shift_mode)
-            c1.info(f"✅ **{n_tutors}** Tutores importados")
-        except Exception as e:
-            c1.error(f"Erro no arquivo de Tutores: {e}")
+@st.cache_data
+def _get_school_stats(s_bytes, shift_mode):
+    _, _, _, n_schools, n_vacancies = opt.read_schools(io.BytesIO(s_bytes), shift_mode)
+    return n_schools, n_vacancies
+
+def show_file_stats(t_file, s_file, shift_mode):
+    # Exibe estatísticas básicas dos arquivos importados para feedback imediato ao usuário
+    c1, c2 = st.columns(2)
 
     if s_file:
         try:
-            # CORRIGIDO: Agora tem 3 underlines para ignorar os 3 primeiros e pegar os dois últimos
-            _, _, _, n_schools, n_vacancies = opt.read_schools(s_file, shift_mode)
-            c2.info(f"✅ **{n_schools}** Escolas importadas, com **{n_vacancies}** vagas totais")
+            n_schools, n_vacancies = _get_school_stats(s_file.getvalue(), shift_mode)
+            c1.info(f"✅ **{n_schools}** Escolas importadas, com **{n_vacancies}** vagas totais")
         except Exception as e:
-            c2.error(f"Erro no arquivo de Escolas: {e}")
+            c1.error(f"Erro no arquivo de Escolas: {e}")
+
+    if t_file:
+        try:
+            n_tutors = _get_tutor_count(t_file.getvalue(), shift_mode)
+            c2.info(f"✅ **{n_tutors}** Tutores importados")
+        except Exception as e:
+            c2.error(f"Erro no arquivo de Tutores: {e}")
 
 # --- BARRA LATERAL COM BOTÕES ---
 with st.sidebar:
@@ -215,26 +217,21 @@ if st.session_state.current_page == "config":
 
     with col2:
         st.markdown("##### Arquivos de Entrada")
-        st.markdown("Faça o upload dos arquivos CSV contendo os dados dos tutores e das escolas:")
-        tutors_file = st.file_uploader("Upload do arquivo de Tutores (CSV)", type=["csv"], key="tutors_uploader")
-
-        if tutors_file is not None:
-            try:
-                #tutors_df = pd.read_csv(tutors_file)
-                st.success("Arquivo de Tutores carregado com sucesso!", icon="✅")
-                #st.dataframe(tutors_df.head())
-
-            except Exception as e:
-                st.error(f"Erro ao ler o arquivo de Tutores: {e}")
+        st.markdown("Faça o upload dos arquivos CSV contendo os dados das escolas e dos tutores:")
 
         schools_file = st.file_uploader("Upload do arquivo de Escolas (CSV)", type=["csv"], key="schools_uploader")
         if schools_file is not None:
-            try:
-                #schools_df = pd.read_csv(schools_file)
-                st.success("Arquivo de Escolas carregado com sucesso!", icon="✅")
-                #st.dataframe(schools_df.head())
-            except Exception as e:
-                st.error(f"Erro ao ler o arquivo de Escolas: {e}")
+            st.success("Arquivo de Escolas carregado com sucesso!", icon="✅")
+        elif st.session_state.get("schools_file"):
+            schools_file = st.session_state.schools_file
+            st.info("Arquivo de Escolas previamente importado (envie um novo para substituir).")
+
+        tutors_file = st.file_uploader("Upload do arquivo de Tutores (CSV)", type=["csv"], key="tutors_uploader")
+        if tutors_file is not None:
+            st.success("Arquivo de Tutores carregado com sucesso!", icon="✅")
+        elif st.session_state.get("tutors_file"):
+            tutors_file = st.session_state.tutors_file
+            st.info("Arquivo de Tutores previamente importado (envie um novo para substituir).")
 
     with col3: 
         st.markdown("##### Parâmetros do Algoritmo de Otimização")
@@ -292,7 +289,7 @@ if st.session_state.current_page == "config":
     if tutors_file or schools_file:
         st.markdown("---")
         st.markdown("##### 🔍 Pré-visualização dos Dados")
-        show_file_stats(tutors_file, schools_file, selected_shift_mode_label)
+        show_file_stats(tutors_file, schools_file, shift_mode)
 
     #st.write("Configurações: ", pref1, "/", pref2, "/", pref3, "/", baseDistance, "/", baseRanking, "/", decayType, "/", sigmoidCurve)
 
