@@ -4,7 +4,29 @@ import math
 import pandas as pd
 from mip import Model, xsum, MAXIMIZE, BINARY, CBC, OptimizationStatus
 
-distance_matrix = 'distancias.csv'
+# =============================================================================
+# FUNÇÕES AUXILIARES
+# =============================================================================
+
+def _get_time_slots(shift_mode):
+    """Retorna a lista de turnos conforme o modo selecionado."""
+    if shift_mode == 'days_shifts':
+        days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
+        shifts_per_day = ['Manha', 'Tarde']
+        return [f"{day}_{shift}" for day in days for shift in shifts_per_day]
+    elif shift_mode == 'shifts':
+        return ['Manha', 'Tarde']
+    else:
+        raise ValueError(f"Modo de turno '{shift_mode}' desconhecido.")
+
+def _open_file(file_input):
+    """Abre arquivo CSV aceitando caminho (string) ou objeto em memória (BytesIO).
+    Retorna (arquivo, deve_fechar) para uso com bloco try/finally."""
+    if isinstance(file_input, str):
+        f = open(file_input, 'r', encoding='utf-8')
+        return f, True
+    file_input.seek(0)
+    return io.StringIO(file_input.read().decode('utf-8')), False
 
 # =============================================================================
 # FUNÇÕES DE LEITURA DE ARQUIVOS
@@ -36,19 +58,7 @@ def read_tutors(file_input, shift_mode):
     rankings = {}
     tutor_districts = {}
 
-    # --- LÓGICA HÍBRIDA ---
-    if isinstance(file_input, str):
-        # Rodando localmente: abre o arquivo pelo caminho
-        f = open(file_input, 'r', encoding='utf-8')
-        should_close = True
-        reader_source = f
-    else:
-        # Rodando no Streamlit: usa o objeto em memória
-        file_input.seek(0)                                      # Rebobina o arquivo
-        content = file_input.read().decode('utf-8')             # Decodifica
-        f = io.StringIO(content)                                # Cria o StringIO
-        should_close = False
-        reader_source = f
+    reader_source, should_close = _open_file(file_input)
 
     try:
         reader = csv.DictReader(reader_source)
@@ -62,9 +72,7 @@ def read_tutors(file_input, shift_mode):
             rankings[tutor] = int(rank_val if rank_val else '0')
 
             if shift_mode == 'days_shifts':
-                days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
-                shifts_per_day = ['Manha', 'Tarde']
-                time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
+                time_slots = _get_time_slots(shift_mode)
 
                 for time_slot in time_slots:
                     # Usa .get() para segurança e trata strings vazias como '0'
@@ -72,7 +80,7 @@ def read_tutors(file_input, shift_mode):
                     availability[(tutor, time_slot)] = int(slot_val if slot_val else '0')
 
             elif shift_mode == 'shifts':
-                for time_slot in ['Manha', 'Tarde']:
+                for time_slot in _get_time_slots(shift_mode):
                     slot_val = row.get(time_slot, '0')
                     availability[(tutor, time_slot)] = int(slot_val if slot_val else '0')
             
@@ -98,7 +106,7 @@ def read_tutors(file_input, shift_mode):
     finally:
         # Garante fechamento apenas se o arquivo foi aberto fisicamente
         if should_close:
-            f.close()
+            reader_source.close()
 
     return tutors, availability, preferences, rankings, tutor_districts, len(tutors)
 
@@ -125,18 +133,7 @@ def read_schools(file_input, shift_mode):
     school_districts = {}
     total_vacancies = 0
 
-    if isinstance(file_input, str):
-        # Rodando localmente: abre o arquivo pelo caminho
-        f = open(file_input, 'r', encoding='utf-8')
-        should_close = True
-        reader_source = f
-    else:
-        # Rodando no Streamlit: usa o objeto em memória
-        file_input.seek(0)                                      # Rebobina o arquivo
-        content = file_input.read().decode('utf-8')             # Decodifica
-        f = io.StringIO(content)                                # Cria o StringIO
-        should_close = False
-        reader_source = f
+    reader_source, should_close = _open_file(file_input)
 
     try:
         reader = csv.DictReader(reader_source)
@@ -153,9 +150,7 @@ def read_schools(file_input, shift_mode):
             school_districts[school] = district
 
             if shift_mode == 'days_shifts':
-                days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
-                shifts_per_day = ['Manha', 'Tarde']
-                time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
+                time_slots = _get_time_slots(shift_mode)
 
                 for time_slot in time_slots:
                     slot_val = row.get(time_slot, '0')
@@ -164,7 +159,7 @@ def read_schools(file_input, shift_mode):
                     total_vacancies += val
 
             elif shift_mode == 'shifts':
-                for time_slot in ['Manha', 'Tarde']:
+                for time_slot in _get_time_slots(shift_mode):
                     slot_val = row.get(time_slot, '0')
                     val = int(slot_val if slot_val else '0')
                     vacancies[(time_slot, school)] = val
@@ -177,7 +172,7 @@ def read_schools(file_input, shift_mode):
     finally:
         # Garante fechamento apenas se o arquivo foi aberto fisicamente pelo código local
         if should_close:
-            f.close()
+            reader_source.close()
     
     return schools, vacancies, school_districts, len(schools), total_vacancies
 
@@ -198,18 +193,7 @@ def read_distances(file_input):
     """
     distances = {}
 
-    if isinstance(file_input, str):
-        # Rodando localmente: abre o arquivo pelo caminho
-        f = open(file_input, 'r', encoding='utf-8')
-        should_close = True
-        reader_source = f
-    else:
-        # Rodando no Streamlit: usa o objeto em memória
-        file_input.seek(0)
-        content = file_input.read().decode('utf-8')
-        f = io.StringIO(content)
-        should_close = False
-        reader_source = f
+    reader_source, should_close = _open_file(file_input)
 
     try:
         reader = csv.reader(reader_source)
@@ -250,7 +234,7 @@ def read_distances(file_input):
     finally:
         # Garante fechamento apenas se o arquivo foi aberto fisicamente
         if should_close:
-            f.close()
+            reader_source.close()
             
     return distances
 
@@ -453,14 +437,7 @@ def generate_allocation(tutors_file, schools_file, distances_file, params_dict):
         # --- Definir Parâmetros de Turno ---
         shift_mode = params_dict.get('shift_mode', 'days_shifts') 
 
-        if shift_mode == 'days_shifts':
-            days = ['Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta']
-            shifts_per_day = ['Manha', 'Tarde']
-            time_slots = [f"{day}_{shift}" for day in days for shift in shifts_per_day]
-        elif shift_mode == 'shifts':
-            time_slots = ['Manha', 'Tarde']
-        else:
-            raise ValueError(f"Modo de turno '{shift_mode}' desconhecido.")
+        time_slots = _get_time_slots(shift_mode)
 
         # --- Extrair Parâmetros de Configuração ---
         PREF1_SCORE = params_dict.get('pref1', 8000)
