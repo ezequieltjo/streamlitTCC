@@ -446,7 +446,7 @@ def generate_allocation(tutors_file, schools_file, distances_file, params_dict):
     - params_dict: Um dicionário com todos os parâmetros da página de config
     
     Retorna:
-    - Um dicionário contendo o DataFrame final, as estatísticas e os dados puros (raw_data).
+    - Um dicionário contendo o DataFrame final, as estatísticas e os dados puros (raw_data)
     """
     
     try:
@@ -507,7 +507,8 @@ def generate_allocation(tutors_file, schools_file, distances_file, params_dict):
         for t in tutors:
             for time_slot in time_slots:
                 for s in schools:
-                    # Só cria a variável de decisão se o tutor tem disponibilidade E a escola tem vaga.
+                    # Só cria a variável de decisão se o tutor tem disponibilidade E a escola tem vaga
+                    # Já incorpora a terceira restrição (disponibilidade dos tutores) na própria criação das variáveis
                     if availability.get((t, time_slot), 0) > 0 and vacancies.get((time_slot, s), 0) > 0:
                         X[(t, time_slot, s)] = model.add_var(var_type=BINARY)
 
@@ -526,10 +527,14 @@ def generate_allocation(tutors_file, schools_file, distances_file, params_dict):
                 if vars_escola_turno:
                     model += xsum(vars_escola_turno) <= vacancies.get((time_slot, s), 0)
 
-        # Restrição 3: Respeitar disponibilidade dos tutores
-        for keys, var in X.items():
-            t, time_slot, s = keys
-            model += var <= availability.get((t, time_slot), 0)
+        # Restrição 3: Disponibilidade dos tutores
+        #for keys, var in X.items():
+        #    t, time_slot, s = keys
+        #    model += var <= availability.get((t, time_slot), 0)
+        # A garantia de disponibilidade já está incorporada na filtragem feita durante a
+        # criação das variáveis X: só existe variável se availability > 0.
+        # Como X[t,ts,s] só é criada quando availability == 1 e é do tipo BINARY (0 ou 1),
+        # adicionar "var <= 1" seria redundante. Por isso esta restrição foi omitida.
 
         # Função Objetivo
         model.objective = xsum(
