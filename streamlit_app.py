@@ -220,6 +220,10 @@ if st.session_state.current_page == "config":
         st.markdown("##### Arquivos de Entrada")
         st.markdown("Faça o upload dos arquivos CSV contendo os dados das escolas e dos tutores:")
 
+        # Recupera shift_mode dos parâmetros salvos (ainda não definido em col3 nesta rerun)
+        _saved = st.session_state.get("params", {})
+        shift_mode = _saved.get("shift_mode", "days_shifts")
+
         schools_file = st.file_uploader("Upload do arquivo de Escolas (CSV)", type=["csv"], key="schools_uploader")
         if schools_file is not None:
             try:
