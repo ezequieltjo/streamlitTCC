@@ -114,7 +114,7 @@ if st.session_state.current_page == "home":
                             t_file = st.session_state.tutors_file
                             s_file = st.session_state.schools_file
                             params = st.session_state.params
-                            d_file = "distancias.csv" 
+                            d_file = st.session_state.get("distances_file", "distancias.csv")
                             
                             result_dict = opt.generate_allocation(t_file, s_file, d_file, params)
                             
@@ -234,6 +234,18 @@ if st.session_state.current_page == "config":
             tutors_file = st.session_state.tutors_file
             st.info("Arquivo de Tutores previamente importado (envie um novo para substituir).")
 
+        st.markdown("---")
+        st.markdown("##### Distâncias (Opcional)")
+        st.markdown("Faça o upload da matriz de distâncias entre escolas. Se nenhum arquivo for enviado, será utilizado o arquivo padrão `distancias.csv`.")
+        distances_file = st.file_uploader("Upload do arquivo de Distâncias (CSV)", type=["csv"], key="distances_uploader")
+        if distances_file is not None:
+            st.success("Arquivo de Distâncias carregado com sucesso!", icon="✅")
+        elif st.session_state.get("distances_file"):
+            distances_file = st.session_state.distances_file
+            st.info("Arquivo de Distâncias previamente importado (envie um novo para substituir).")
+        else:
+            st.info("Nenhum arquivo enviado — será usado o padrão `distancias.csv`.")
+
     with col3:
         st.markdown("##### Parâmetros do Algoritmo de Otimização")
         st.markdown("Ajuste os parâmetros que influenciam a alocação dos tutores às escolas:")
@@ -320,6 +332,8 @@ if st.session_state.current_page == "config":
                     # Salvar arquivos na sessão
                     st.session_state.tutors_file = tutors_file
                     st.session_state.schools_file = schools_file
+                    if distances_file is not None:
+                        st.session_state.distances_file = distances_file
 
                     # Salvar parâmetros na sessão
                     st.session_state.params = {
