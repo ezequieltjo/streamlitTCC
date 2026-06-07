@@ -222,17 +222,33 @@ if st.session_state.current_page == "config":
 
         schools_file = st.file_uploader("Upload do arquivo de Escolas (CSV)", type=["csv"], key="schools_uploader")
         if schools_file is not None:
-            st.success("Arquivo de Escolas carregado com sucesso!", icon="✅")
+            try:
+                n_schools, n_vacancies = _get_school_stats(schools_file.getvalue(), shift_mode)
+                st.success(f"Escolas carregadas: **{n_schools}** escolas com **{n_vacancies}** vagas totais", icon="✅")
+            except Exception as e:
+                st.error(f"Erro no arquivo de Escolas: {e}")
         elif st.session_state.get("schools_file"):
             schools_file = st.session_state.schools_file
-            st.info("Arquivo de Escolas previamente importado (envie um novo para substituir).")
+            try:
+                n_schools, n_vacancies = _get_school_stats(schools_file.getvalue(), shift_mode)
+                st.info(f"Escolas previamente importadas: **{n_schools}** escolas com **{n_vacancies}** vagas totais")
+            except Exception:
+                st.info("Arquivo de Escolas previamente importado (envie um novo para substituir).")
 
         tutors_file = st.file_uploader("Upload do arquivo de Tutores (CSV)", type=["csv"], key="tutors_uploader")
         if tutors_file is not None:
-            st.success("Arquivo de Tutores carregado com sucesso!", icon="✅")
+            try:
+                n_tutors = _get_tutor_count(tutors_file.getvalue(), shift_mode)
+                st.success(f"Tutores carregados: **{n_tutors}** tutores importados", icon="✅")
+            except Exception as e:
+                st.error(f"Erro no arquivo de Tutores: {e}")
         elif st.session_state.get("tutors_file"):
             tutors_file = st.session_state.tutors_file
-            st.info("Arquivo de Tutores previamente importado (envie um novo para substituir).")
+            try:
+                n_tutors = _get_tutor_count(tutors_file.getvalue(), shift_mode)
+                st.info(f"Tutores previamente importados: **{n_tutors}** tutores")
+            except Exception:
+                st.info("Arquivo de Tutores previamente importado (envie um novo para substituir).")
 
         st.markdown("---")
         st.markdown("##### Distâncias (Opcional)")
@@ -316,11 +332,6 @@ if st.session_state.current_page == "config":
         if st.button("Usar configuração recomendada"):
             st.session_state.pop("params", None)
             st.rerun()
-
-    if tutors_file or schools_file:
-        st.markdown("---")
-        st.markdown("##### 🔍 Pré-visualização dos Dados")
-        show_file_stats(tutors_file, schools_file, shift_mode)
 
     btn_c1, btn_c2, btn_c3 = st.columns([2, 1, 2])
     with btn_c2:
